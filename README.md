@@ -36,7 +36,7 @@
 
 ### 1. 克隆项目 & 环境变量
 ```bash
-git clone https://github.com/your-username/prism.git
+git clone https://github.com/A-Words/prism.git
 cd prism
 # 复制环境变量模板
 cp .env.example .env

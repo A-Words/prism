@@ -1,0 +1,65 @@
+# 操作系统文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE / 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vim/
+
+# 环境变量文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# 日志文件
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker 数据卷
+volumes/
+data/
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 备份文件
+*.bak
+*.backup
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+
+# 构建输出 (各服务自己的 .gitignore 会更详细)
+dist/
+build/
+
+# 依赖目录 (子目录已有，这里作为二次保险)
+node_modules/
+vendor/
+__pycache__/
+
+# 测试覆盖率
+coverage/
+.coverage
+htmlcov/
+
+# Supabase 本地配置
+.supabase/
+
+# 其他
+.cache/
