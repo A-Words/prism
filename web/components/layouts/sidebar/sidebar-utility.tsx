@@ -3,33 +3,26 @@ import { usePathname } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export type SidebarNavItem = {
+type SidebarUtilityItem = {
   title: string
   href: string
   icon: LucideIcon
 }
 
-type SidebarNavSectionProps = {
-  label: string
-  items: SidebarNavItem[]
+type SidebarUtilityProps = {
+  items: SidebarUtilityItem[]
+  onNavigate?: () => void
 }
 
-export default function SidebarNavSection({
-  label,
+export default function SidebarUtility({
   items,
-}: SidebarNavSectionProps) {
+  onNavigate,
+}: SidebarUtilityProps) {
   const pathname = usePathname()
 
   return (
-    <div className={cn("mb-6")}>
-      <p
-        className={cn(
-          "px-3 text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500"
-        )}
-      >
-        {label}
-      </p>
-      <nav className={cn("mt-2 space-y-1")}>
+    <div className="border-t border-slate-200 px-3 py-4 dark:border-slate-800">
+      <nav className="space-y-1">
         {items.map((item) => {
           const active = pathname === item.href
           const Icon = item.icon
@@ -44,8 +37,9 @@ export default function SidebarNavSection({
                   ? "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100"
                   : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
               )}
+              onClick={onNavigate}
             >
-              <Icon className={cn("h-4 w-4")} />
+              <Icon className="h-4 w-4" />
               <span>{item.title}</span>
             </Link>
           )

@@ -8,7 +8,7 @@ import {
   NotebookPen,
   Settings,
 } from "lucide-react"
-import type { SidebarNavItem } from "@/components/sidebar/sidebar-nav-section"
+import type { SidebarNavItem } from "@/components/layouts/sidebar/sidebar-nav-section"
 
 type SidebarSection = {
   label: string

@@ -1,8 +1,7 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
 import './globals.css'
-import Sidebar from '@/components/sidebar'
-import { cn } from '@/lib/utils'
+import AppLayout from '@/components/layouts/app-layout'
 
 export const metadata: Metadata = {
   title: 'Prism - AI 个性化学习系统',
@@ -31,16 +30,7 @@ export default function RootLayout({
   }
 })()`}
         </Script>
-        <div
-          className={cn(
-            'flex min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100'
-          )}
-        >
-          <Sidebar />
-          <div className={cn('flex-1')}>
-            <main className={cn('min-h-screen px-8 py-10')}>{children}</main>
-          </div>
-        </div>
+        <AppLayout>{children}</AppLayout>
       </body>
     </html>
   )
