@@ -37,8 +37,8 @@ export default function SidebarUtility({ items }: SidebarUtilityProps) {
               <Icon className={cn("h-4 w-4")} />
               <span>{item.title}</span>
             </Link>
-          )}
-        ))}
+          )
+        })}
       </nav>
     </div>
   )
