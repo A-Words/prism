@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import Sidebar from '@/components/sidebar'
 
 export const metadata: Metadata = {
   title: 'Prism - AI 个性化学习系统',
@@ -13,7 +14,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <div className="flex min-h-screen bg-slate-50 text-slate-900">
+          <Sidebar />
+          <div className="flex-1">
+            <main className="min-h-screen px-8 py-10">{children}</main>
+          </div>
+        </div>
+      </body>
     </html>
   )
 }
