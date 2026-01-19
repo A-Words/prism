@@ -1,7 +1,7 @@
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 
-export default function RootLayout({ children }: RootLayoutProps) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <html lang="zh" suppressHydrationWarning>
@@ -14,7 +14,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
             disableTransitionOnChange
           >
             <main>
-                {children}
+              {children}
             </main>
           </ThemeProvider>
         </body>
