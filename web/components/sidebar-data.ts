@@ -7,8 +7,14 @@ import {
   LayoutDashboard,
   NotebookPen,
   Settings,
+  type LucideIcon,
 } from "lucide-react"
-import type { SidebarNavItem } from "@/components/layouts/sidebar/sidebar-nav-section"
+
+export type SidebarNavItem = {
+  title: string
+  href: string
+  icon: LucideIcon
+}
 
 type SidebarSection = {
   label: string
