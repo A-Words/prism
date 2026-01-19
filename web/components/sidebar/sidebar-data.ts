@@ -10,18 +10,19 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-export type SidebarNavItem = {
+export type NavItem = {
   title: string
   href: string
   icon: LucideIcon
 }
 
-type SidebarSection = {
+export type NavSection = {
   label: string
-  items: SidebarNavItem[]
+  items: NavItem[]
 }
 
-export const sidebarSections: SidebarSection[] = [
+// 主导航分组
+export const navMain: NavSection[] = [
   {
     label: "概览",
     items: [
@@ -41,6 +42,7 @@ export const sidebarSections: SidebarSection[] = [
   },
 ]
 
-export const sidebarUtilityItems: SidebarNavItem[] = [
+// 次级导航项
+export const navSecondary: NavItem[] = [
   { title: "设置", href: "/settings", icon: Settings },
 ]
