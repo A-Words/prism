@@ -29,6 +29,11 @@ func main() {
 	)
 	h := handler.NewAPIHandler(learningService)
 
+	jwksValidator, err := middleware.NewJWKSValidator(cfg.SupabaseJWKSURL)
+	if err != nil {
+		log.Fatalf("Failed to initialize JWKS validator: %v", err)
+	}
+
 	r := gin.Default()
 	r.Use(corsMiddleware())
 
@@ -44,7 +49,7 @@ func main() {
 	})
 
 	api := r.Group("/api/v1")
-	api.Use(middleware.RequireJWT(cfg.JWTSecret))
+	api.Use(jwksValidator.Middleware())
 	{
 		api.POST("/assessment/cold-start/sessions", h.CreateColdStartSession)
 		api.POST("/assessment/cold-start/sessions/:sessionId/submit", h.SubmitColdStartSession)

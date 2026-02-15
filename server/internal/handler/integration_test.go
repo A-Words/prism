@@ -3,7 +3,11 @@ package handler
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -30,33 +34,49 @@ func (f fakeAI) PredictOutcome(_ context.Context, _ model.AIPredictOutcomeReques
 	return model.AIPredictOutcomeResponse{CalibrationFactor: 1, Rationale: "ok"}, nil
 }
 
-func setupRouter(secret string) *gin.Engine {
+func setupRouter(t *testing.T) (*gin.Engine, *rsa.PrivateKey, string) {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate rsa key: %v", err)
+	}
+	kid := "integration-kid"
+	jwksServer := newJWKSHTTPServer(t, kid, &privateKey.PublicKey)
+	t.Cleanup(jwksServer.Close)
+
+	validator, err := middleware.NewJWKSValidator(jwksServer.URL)
+	if err != nil {
+		t.Fatalf("new jwks validator: %v", err)
+	}
+
 	gin.SetMode(gin.TestMode)
 	repo := repository.NewMemoryRepository()
 	svc := service.NewLearningService(repo, fakeAI{}, "https://example.supabase.co", "service-key", "bucket", "")
 	h := NewAPIHandler(svc)
+
 	r := gin.New()
 	api := r.Group("/api/v1")
-	api.Use(middleware.RequireJWT(secret))
+	api.Use(validator.Middleware())
 	api.POST("/assessment/cold-start/sessions", h.CreateColdStartSession)
 	api.POST("/assessment/cold-start/sessions/:sessionId/submit", h.SubmitColdStartSession)
 	api.GET("/learning-paths/current", h.GetCurrentLearningPath)
-	return r
+	return r, privateKey, kid
 }
 
-func authToken(secret string) string {
-	t := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+func authToken(privateKey *rsa.PrivateKey, kid string) string {
+	t := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 		"sub": "test-user",
 		"exp": time.Now().Add(time.Hour).Unix(),
 	})
-	token, _ := t.SignedString([]byte(secret))
+	t.Header["kid"] = kid
+	token, _ := t.SignedString(privateKey)
 	return token
 }
 
 func TestColdStartEndpointFlow(t *testing.T) {
-	secret := "integration-secret"
-	r := setupRouter(secret)
-	token := authToken(secret)
+	r, privateKey, kid := setupRouter(t)
+	token := authToken(privateKey, kid)
 
 	createPayload := model.CreateSessionRequest{
 		Subject:          "math",
@@ -103,6 +123,27 @@ func TestColdStartEndpointFlow(t *testing.T) {
 	if getResp.Code != http.StatusOK {
 		t.Fatalf("get path failed: %d %s", getResp.Code, getResp.Body.String())
 	}
+}
+
+func newJWKSHTTPServer(t *testing.T, kid string, publicKey *rsa.PublicKey) *httptest.Server {
+	t.Helper()
+	payload := map[string]any{
+		"keys": []map[string]any{{
+			"kty": "RSA",
+			"kid": kid,
+			"alg": "RS256",
+			"use": "sig",
+			"n":   base64.RawURLEncoding.EncodeToString(publicKey.N.Bytes()),
+			"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(publicKey.E)).Bytes()),
+		}},
+	}
+
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(payload); err != nil {
+			t.Fatalf("encode jwks payload: %v", err)
+		}
+	}))
 }
 
 func toString(value int) string {
