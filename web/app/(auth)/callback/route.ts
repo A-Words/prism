@@ -3,21 +3,41 @@ import { NextResponse } from "next/server"
 
 import { sanitizeRedirectTo } from "@/lib/auth/redirect"
 
+function resolveSiteURL(): URL | null {
+  const rawSiteURL = process.env.SITE_URL
+  if (!rawSiteURL) {
+    return null
+  }
+  try {
+    return new URL(rawSiteURL)
+  } catch {
+    return null
+  }
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const code = url.searchParams.get("code")
   const redirectTo = sanitizeRedirectTo(url.searchParams.get("redirectTo"))
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const siteURL = resolveSiteURL()
+
+  if (!siteURL) {
+    return NextResponse.json(
+      { error: "Missing or invalid SITE_URL for callback" },
+      { status: 500 }
+    )
+  }
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    const loginUrl = new URL("/login", url.origin)
+    const loginUrl = new URL("/login", siteURL)
     loginUrl.searchParams.set("error", "Missing Supabase env for callback")
     return NextResponse.redirect(loginUrl)
   }
 
   // 关键点：在 Route Handler 中把 Supabase 写入的 session cookie 绑定到 response。
-  const response = NextResponse.redirect(new URL(redirectTo, url.origin))
+  const response = NextResponse.redirect(new URL(redirectTo, siteURL))
   const requestCookies = new Headers(request.headers).get("cookie") ?? ""
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -42,7 +62,7 @@ export async function GET(request: Request) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
-      const loginUrl = new URL("/login", url.origin)
+      const loginUrl = new URL("/login", siteURL)
       loginUrl.searchParams.set("error", error.message)
       loginUrl.searchParams.set("redirectTo", redirectTo)
       return NextResponse.redirect(loginUrl)
