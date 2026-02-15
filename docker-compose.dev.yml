@@ -1,0 +1,82 @@
+services:
+  web:
+    image: node:22-alpine
+    working_dir: /app
+    command: >
+      sh -c "npm install &&
+      npm run dev -- --hostname 0.0.0.0 --port 3000"
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      NEXT_PUBLIC_API_BASE_URL: "http://localhost:8080/api/v1"
+    env_file:
+      - path: ./.env
+        required: false
+    volumes:
+      - ./web:/app
+      - web_node_modules:/app/node_modules
+    depends_on:
+      - server
+    networks:
+      - prism-network
+
+  server:
+    image: golang:1.25-alpine
+    working_dir: /app
+    command: >
+      sh -c "go mod download &&
+      go install github.com/githubnemo/CompileDaemon@latest &&
+      /go/bin/CompileDaemon -polling
+      -directory=/app
+      -exclude-dir=.git
+      -exclude-dir=tmp
+      -build='go build -o /tmp/server main.go'
+      -command='/tmp/server'"
+    ports:
+      - "8080:8080"
+    environment:
+      GIN_MODE: debug
+      PORT: "8080"
+      AI_SERVICE_URL: "http://ai:5000"
+    env_file:
+      - path: ./.env
+        required: false
+    volumes:
+      - ./server:/app
+      - go_pkg_mod:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    depends_on:
+      - ai
+    networks:
+      - prism-network
+
+  ai:
+    image: python:3.14-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install --no-cache-dir -r requirements.txt &&
+      uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
+    ports:
+      - "5000:5000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    env_file:
+      - path: ./.env
+        required: false
+    volumes:
+      - ./ai:/app
+    networks:
+      - prism-network
+
+networks:
+  prism-network:
+    driver: bridge
+
+volumes:
+  web_node_modules:
+  go_pkg_mod:
+  go_build_cache:
