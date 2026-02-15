@@ -2,7 +2,7 @@
 
 You are an expert Full Stack Developer assisting in the development of **Prism**, an AI-powered adaptive learning ecosystem that provides comprehensive learning support including path planning, intelligent tutoring, note-taking, and health management.
 
-**Current Date**: 2026-01-15
+**Current Date**: 2026-02-15
 **Tone**: Professional, technical, concise.
 **Language for Comments**: Chinese (中文).
 
@@ -34,6 +34,7 @@ The project is a Monorepo with three distinct services. Always respect the bound
 - **State/Auth**: Supabase Auth (SSR supported), `proxy.ts + auth.getUser()` server-side guards, React Context for local state.
 - **Visualization**: ECharts for radar charts/graphs.
 - **Media Capture**: WebRTC for video/audio stream capture.
+- **Testing**: Vitest + React Testing Library + MSW (unit/component/server), Playwright (E2E smoke), GitHub Actions PR gate.
 - **Key Responsibility**: User interface, WebRTC video stream capture, WebSocket communication, scene state management.
 
 ### 📂 /server (Backend Core)
@@ -298,6 +299,11 @@ Always verify schema compliance.
 - **Data Fetching**: Use Server Actions for mutations where possible, or SWR/TanStack Query for client-side fetching.
 - **Supabase**: Use specific client for Server Components vs Client Components.
 - **Route Protection**: Never treat cookie presence as authenticated state. Use `auth.getUser()` for authoritative checks.
+- **Frontend Tests**:
+  - Unit/Component/Server tests use `Vitest` (`jsdom`) and `@testing-library/*`.
+  - Network isolation uses `MSW`; default `onUnhandledRequest` should fail tests.
+  - E2E uses `Playwright` against production build (`npm run build && npm run start`) with Chromium in CI.
+  - Keep security-critical flows covered: `proxy.ts`, `app/(auth)/callback/route.ts`, redirect sanitization, and auth redirects.
 
 ### Backend (Golang)
 - **Error Handling**: Explicit is better than implicit.
@@ -323,4 +329,15 @@ Always verify schema compliance.
 
 ## 5. Development Workflow
 1.  **Migration**: Manage DB migrations via Supabase CLI or Go migration scripts.
-2.  **Testing**: Unit tests for core logic (Go: `testing` package, Py: `pytest`).
+2.  **Testing (Web)**:
+    - `npm run test:coverage` for unit/component/server tests.
+    - `npm run test:e2e` for Playwright smoke tests.
+    - `npm run test:ci` must pass before merge (`lint + coverage + e2e`).
+3.  **Testing (Server/AI)**: Unit tests for core logic (Go: `testing` package, Py: `pytest`).
+4.  **CI Gate (Web)**:
+    - Workflow: `.github/workflows/web-tests.yml`
+    - Trigger: pull requests that touch `web/**` or workflow file.
+    - Jobs: `Web Lint + Unit/Component/Server` and `Web E2E`.
+5.  **Test Environment (Web)**:
+    - Use `.env.test.example` as baseline.
+    - Required variables for test/runtime: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_BASE_URL`, `SITE_URL`.
