@@ -35,6 +35,15 @@ describe("proxy", () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon"
   })
 
+  it("returns next response when supabase env is missing", async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    const response = await proxy(new NextRequest("http://localhost/dashboard"))
+    expect(getRedirectUrl(response)).toBeNull()
+    expect(response.status).toBe(200)
+  })
+
   it("matches business routes and skips static assets", () => {
     expect(unstable_doesMiddlewareMatch({ config, url: "/dashboard" })).toBe(true)
     expect(unstable_doesMiddlewareMatch({ config, url: "/login" })).toBe(true)
@@ -75,6 +84,17 @@ describe("proxy", () => {
     })
 
     const response = await proxy(new NextRequest("http://localhost/callback?redirectTo=/dashboard"))
+    expect(getRedirectUrl(response)).toBeNull()
+    expect(response.status).toBe(200)
+  })
+
+  it("allows authenticated users on protected routes", async () => {
+    getUserMock.mockResolvedValueOnce({
+      data: { user: { id: "user-2" } },
+      error: null,
+    })
+
+    const response = await proxy(new NextRequest("http://localhost/dashboard"))
     expect(getRedirectUrl(response)).toBeNull()
     expect(response.status).toBe(200)
   })

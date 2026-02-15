@@ -48,3 +48,10 @@ test("callback redirectTo blocks external redirects", async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?redirectTo=%2Fdashboard$/)
   expect(page.url()).not.toContain("evil.com")
 })
+
+test("callback blocks absolute external redirect urls", async ({ page }) => {
+  await page.goto("/callback?redirectTo=https://evil.com/path")
+
+  await expect(page).toHaveURL(/\/login\?redirectTo=%2Fdashboard$/)
+  expect(page.url()).not.toContain("evil.com")
+})

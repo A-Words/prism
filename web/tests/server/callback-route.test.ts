@@ -84,4 +84,16 @@ describe("GET /callback", () => {
     expect(response.status).toBe(307)
     expect(response.headers.get("location")).toBe("http://localhost:3000/dashboard")
   })
+
+  it("returns redirect without code exchange when code is absent", async () => {
+    const response = await GET(
+      new Request("http://localhost:3000/callback?redirectTo=/assessment", {
+        headers: { cookie: "sb-refresh-token=abc%20123" },
+      })
+    )
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get("location")).toBe("http://localhost:3000/assessment")
+    expect(exchangeCodeForSessionMock).not.toHaveBeenCalled()
+  })
 })
