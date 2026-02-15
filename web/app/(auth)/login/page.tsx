@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/client"
+import { sanitizeRedirectTo } from "@/lib/auth/redirect"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,8 +20,15 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    setRedirectTo(params.get("redirectTo") ?? "/dashboard")
+    setRedirectTo(sanitizeRedirectTo(params.get("redirectTo")))
 
+    const callbackError = params.get("error")
+    if (callbackError) {
+      setError(callbackError)
+    }
+  }, [])
+
+  useEffect(() => {
     const hash = window.location.hash
     if (!hash.includes("access_token") || !hash.includes("refresh_token")) {
       return
@@ -62,11 +70,12 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient()
-      const emailRedirectTo = `${window.location.origin}/callback`
+      const callbackUrl = new URL("/callback", window.location.origin)
+      callbackUrl.searchParams.set("redirectTo", redirectTo)
       const { error: signInError } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo,
+          emailRedirectTo: callbackUrl.toString(),
         },
       })
       if (signInError) {

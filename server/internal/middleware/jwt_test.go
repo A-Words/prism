@@ -17,6 +17,8 @@ import (
 
 func TestJWKSValidatorMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	const expectedIssuer = "https://example.supabase.co/auth/v1"
+	const expectedAudience = "authenticated"
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -26,7 +28,7 @@ func TestJWKSValidatorMiddleware(t *testing.T) {
 	jwkServer := newJWKSHTTPServer(t, kid, &privateKey.PublicKey)
 	defer jwkServer.Close()
 
-	validator, err := NewJWKSValidator(jwkServer.URL)
+	validator, err := NewJWKSValidator(jwkServer.URL, expectedIssuer, expectedAudience)
 	if err != nil {
 		t.Fatalf("new jwks validator: %v", err)
 	}
@@ -40,6 +42,8 @@ func TestJWKSValidatorMiddleware(t *testing.T) {
 	validToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 		"sub": "user-123",
 		"exp": time.Now().Add(time.Hour).Unix(),
+		"iss": expectedIssuer,
+		"aud": expectedAudience,
 	})
 	validToken.Header["kid"] = kid
 	validTokenString, err := validToken.SignedString(privateKey)
@@ -65,6 +69,8 @@ func TestJWKSValidatorMiddleware(t *testing.T) {
 	expiredToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 		"sub": "user-123",
 		"exp": time.Now().Add(-time.Hour).Unix(),
+		"iss": expectedIssuer,
+		"aud": expectedAudience,
 	})
 	expiredToken.Header["kid"] = kid
 	expiredTokenString, err := expiredToken.SignedString(privateKey)
@@ -83,6 +89,8 @@ func TestJWKSValidatorMiddleware(t *testing.T) {
 	wrongKidToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 		"sub": "user-123",
 		"exp": time.Now().Add(time.Hour).Unix(),
+		"iss": expectedIssuer,
+		"aud": expectedAudience,
 	})
 	wrongKidToken.Header["kid"] = "other-kid"
 	wrongKidTokenString, err := wrongKidToken.SignedString(privateKey)
@@ -96,6 +104,46 @@ func TestJWKSValidatorMiddleware(t *testing.T) {
 	r.ServeHTTP(wWrongKid, reqWrongKid)
 	if wWrongKid.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for wrong kid token, got %d", wWrongKid.Code)
+	}
+
+	wrongIssuerToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"sub": "user-123",
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"iss": "https://evil.supabase.co/auth/v1",
+		"aud": expectedAudience,
+	})
+	wrongIssuerToken.Header["kid"] = kid
+	wrongIssuerTokenString, err := wrongIssuerToken.SignedString(privateKey)
+	if err != nil {
+		t.Fatalf("sign wrong issuer token: %v", err)
+	}
+
+	reqWrongIssuer := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	reqWrongIssuer.Header.Set("Authorization", "Bearer "+wrongIssuerTokenString)
+	wWrongIssuer := httptest.NewRecorder()
+	r.ServeHTTP(wWrongIssuer, reqWrongIssuer)
+	if wWrongIssuer.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for wrong issuer token, got %d", wWrongIssuer.Code)
+	}
+
+	wrongAudienceToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"sub": "user-123",
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"iss": expectedIssuer,
+		"aud": "service_role",
+	})
+	wrongAudienceToken.Header["kid"] = kid
+	wrongAudienceTokenString, err := wrongAudienceToken.SignedString(privateKey)
+	if err != nil {
+		t.Fatalf("sign wrong audience token: %v", err)
+	}
+
+	reqWrongAudience := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	reqWrongAudience.Header.Set("Authorization", "Bearer "+wrongAudienceTokenString)
+	wWrongAudience := httptest.NewRecorder()
+	r.ServeHTTP(wWrongAudience, reqWrongAudience)
+	if wWrongAudience.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for wrong audience token, got %d", wWrongAudience.Code)
 	}
 }
 

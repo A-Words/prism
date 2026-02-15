@@ -18,14 +18,18 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-// 临时用户数据，实际应从认证上下文获取
-const userData = {
-  name: "学习者",
-  email: "user@prism.ai",
-  avatar: "/avatars/default.png",
+type SidebarUser = {
+  name: string,
+  email: string,
+  avatar: string,
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & {
+  user: SidebarUser
+}) {
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -52,7 +56,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={userData} />
+        <NavUser user={user} />
       </SidebarFooter>
     </Sidebar>
   )

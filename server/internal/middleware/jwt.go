@@ -23,6 +23,8 @@ type JWKSValidator struct {
 	jwksURL      string
 	httpClient   *http.Client
 	refreshEvery time.Duration
+	issuer       string
+	audience     string
 
 	mu          sync.RWMutex
 	keys        map[string]any
@@ -47,15 +49,23 @@ type jwkKey struct {
 	Y   string `json:"y"`
 }
 
-func NewJWKSValidator(jwksURL string) (*JWKSValidator, error) {
+func NewJWKSValidator(jwksURL string, issuer string, audience string) (*JWKSValidator, error) {
 	if strings.TrimSpace(jwksURL) == "" {
 		return nil, errors.New("jwks url is required")
+	}
+	if strings.TrimSpace(issuer) == "" {
+		return nil, errors.New("jwt issuer is required")
+	}
+	if strings.TrimSpace(audience) == "" {
+		return nil, errors.New("jwt audience is required")
 	}
 
 	validator := &JWKSValidator{
 		jwksURL:      jwksURL,
 		httpClient:   &http.Client{Timeout: 8 * time.Second},
 		refreshEvery: 5 * time.Minute,
+		issuer:       strings.TrimSpace(issuer),
+		audience:     strings.TrimSpace(audience),
 		keys:         make(map[string]any),
 	}
 	if err := validator.refreshKeys(); err != nil {
@@ -75,7 +85,16 @@ func (v *JWKSValidator) Middleware() gin.HandlerFunc {
 		tokenString = strings.TrimSpace(strings.TrimPrefix(tokenString, "bearer "))
 
 		claims := jwt.MapClaims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, v.keyFunc)
+		parser := jwt.NewParser(jwt.WithValidMethods([]string{
+			jwt.SigningMethodRS256.Alg(),
+			jwt.SigningMethodRS384.Alg(),
+			jwt.SigningMethodRS512.Alg(),
+			jwt.SigningMethodES256.Alg(),
+			jwt.SigningMethodES384.Alg(),
+			jwt.SigningMethodES512.Alg(),
+			jwt.SigningMethodEdDSA.Alg(),
+		}))
+		token, err := parser.ParseWithClaims(tokenString, claims, v.keyFunc)
 		if err != nil || !token.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			return
@@ -99,6 +118,26 @@ func (v *JWKSValidator) Middleware() gin.HandlerFunc {
 		}
 		if time.Now().UTC().Unix() >= expUnix {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token expired"})
+			return
+		}
+
+		issuer, ok := claims["iss"].(string)
+		if !ok || strings.TrimSpace(issuer) == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing token issuer"})
+			return
+		}
+		if issuer != v.issuer {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token issuer"})
+			return
+		}
+
+		audRaw, ok := claims["aud"]
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing token audience"})
+			return
+		}
+		if !hasAudience(audRaw, v.audience) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token audience"})
 			return
 		}
 
@@ -315,4 +354,31 @@ func toInt64(value any) (int64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func hasAudience(raw any, expected string) bool {
+	switch typed := raw.(type) {
+	case string:
+		return typed == expected
+	case []string:
+		for _, value := range typed {
+			if value == expected {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range typed {
+			value, ok := item.(string)
+			if ok && value == expected {
+				return true
+			}
+		}
+	case jwt.ClaimStrings:
+		for _, value := range typed {
+			if value == expected {
+				return true
+			}
+		}
+	}
+	return false
 }

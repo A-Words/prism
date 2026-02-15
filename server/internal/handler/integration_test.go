@@ -24,6 +24,11 @@ import (
 
 type fakeAI struct{}
 
+const (
+	expectedIssuer   = "https://example.supabase.co/auth/v1"
+	expectedAudience = "authenticated"
+)
+
 func (f fakeAI) VisionOCR(_ context.Context, _ model.AIVisionOCRRequest) (model.AIVisionOCRResponse, error) {
 	return model.AIVisionOCRResponse{Text: "Q1"}, nil
 }
@@ -45,7 +50,7 @@ func setupRouter(t *testing.T) (*gin.Engine, *rsa.PrivateKey, string) {
 	jwksServer := newJWKSHTTPServer(t, kid, &privateKey.PublicKey)
 	t.Cleanup(jwksServer.Close)
 
-	validator, err := middleware.NewJWKSValidator(jwksServer.URL)
+	validator, err := middleware.NewJWKSValidator(jwksServer.URL, expectedIssuer, expectedAudience)
 	if err != nil {
 		t.Fatalf("new jwks validator: %v", err)
 	}
@@ -68,6 +73,8 @@ func authToken(privateKey *rsa.PrivateKey, kid string) string {
 	t := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 		"sub": "test-user",
 		"exp": time.Now().Add(time.Hour).Unix(),
+		"iss": expectedIssuer,
+		"aud": expectedAudience,
 	})
 	t.Header["kid"] = kid
 	token, _ := t.SignedString(privateKey)

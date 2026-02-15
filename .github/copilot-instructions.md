@@ -31,7 +31,7 @@ The project is a Monorepo with three distinct services. Always respect the bound
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript, React
 - **Styling**: Tailwind CSS (Utility-first), Shadcn/UI (Components), Lucide Icons. **NO** .css files allowed except global.css.
-- **State/Auth**: Supabase Auth (SSR supported), React Context for local state.
+- **State/Auth**: Supabase Auth (SSR supported), `proxy.ts + auth.getUser()` server-side guards, React Context for local state.
 - **Visualization**: ECharts for radar charts/graphs.
 - **Media Capture**: WebRTC for video/audio stream capture.
 - **Key Responsibility**: User interface, WebRTC video stream capture, WebSocket communication, scene state management.
@@ -40,7 +40,7 @@ The project is a Monorepo with three distinct services. Always respect the bound
 - **Language**: Go 1.25
 - **Framework**: Gin (Web), Melody (WebSocket).
 - **ORM**: GORM (PostgreSQL driver).
-- **Auth Strategy**: **Local JWT Validation**. The server holds the Supabase JWT Secret and validates tokens locally to minimize latency. Do NOT call Supabase Auth API for every request.
+- **Auth Strategy**: **Local JWT Validation via Supabase JWKS**. Verify signature locally and validate `sub/exp/iss/aud` (`aud` must include `authenticated`). Do NOT call Supabase Auth API for every request.
 - **Key Responsibility**: API Gateway, business logic orchestration, WebSocket connection pool management, chat session management, coordinating between Web and AI services.
 
 ### 📂 /ai (Intelligence Microservice)
@@ -206,7 +206,10 @@ Always verify schema compliance.
 
 ### Authentication
 - **Header**: `Authorization: Bearer <Supabase_JWT>`
-- **Server Verification**: Parse JWT using `HMAC SHA256` with the project's secret. Check `exp` and `sub`.
+- **Server Verification**: Verify JWT signature with Supabase JWKS locally. Enforce `sub`, `exp`, `iss`, and `aud` claims. Reject tokens where `aud` does not include `authenticated`.
+- **Frontend Guard Baseline**: Protected routes must use `proxy.ts` with `auth.getUser()` and protected layouts must perform server-side `auth.getUser()` verification.
+- **Callback Safety**: `redirectTo` must be sanitized to same-origin relative paths only.
+- **Session Operations**: Logout must use `supabase.auth.signOut()` to clear session state and cookies.
 
 ### WebSocket Channels
 
@@ -294,6 +297,7 @@ Always verify schema compliance.
 - **Components**: Keep components under 200 lines. Use Composition.
 - **Data Fetching**: Use Server Actions for mutations where possible, or SWR/TanStack Query for client-side fetching.
 - **Supabase**: Use specific client for Server Components vs Client Components.
+- **Route Protection**: Never treat cookie presence as authenticated state. Use `auth.getUser()` for authoritative checks.
 
 ### Backend (Golang)
 - **Error Handling**: Explicit is better than implicit.

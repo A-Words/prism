@@ -29,7 +29,11 @@ func main() {
 	)
 	h := handler.NewAPIHandler(learningService)
 
-	jwksValidator, err := middleware.NewJWKSValidator(cfg.SupabaseJWKSURL)
+	jwksValidator, err := middleware.NewJWKSValidator(
+		cfg.SupabaseJWKSURL,
+		cfg.SupabaseJWTIssuer,
+		cfg.SupabaseJWTAudience,
+	)
 	if err != nil {
 		log.Fatalf("Failed to initialize JWKS validator: %v", err)
 	}

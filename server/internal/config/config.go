@@ -10,6 +10,8 @@ type Config struct {
 	AIServiceURL           string
 	SupabaseURL            string
 	SupabaseJWKSURL        string
+	SupabaseJWTIssuer      string
+	SupabaseJWTAudience    string
 	SupabaseServiceRoleKey string
 	SupabaseStorageBucket  string
 	SupabaseStorageBaseURL string
@@ -25,12 +27,22 @@ func Load() Config {
 			jwksURL = "http://localhost:8000/auth/v1/.well-known/jwks.json"
 		}
 	}
+	jwtIssuer := os.Getenv("SUPABASE_JWT_ISSUER")
+	if jwtIssuer == "" {
+		if strings.TrimSpace(supabaseURL) != "" {
+			jwtIssuer = strings.TrimRight(supabaseURL, "/") + "/auth/v1"
+		} else {
+			jwtIssuer = "http://localhost:8000/auth/v1"
+		}
+	}
 
 	return Config{
 		Port:                   getEnv("PORT", "8080"),
 		AIServiceURL:           getEnv("AI_SERVICE_URL", "http://localhost:5000"),
 		SupabaseURL:            supabaseURL,
 		SupabaseJWKSURL:        jwksURL,
+		SupabaseJWTIssuer:      jwtIssuer,
+		SupabaseJWTAudience:    getEnv("SUPABASE_JWT_AUDIENCE", "authenticated"),
 		SupabaseServiceRoleKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
 		SupabaseStorageBucket:  getEnv("SUPABASE_STORAGE_BUCKET", "homework-images"),
 		SupabaseStorageBaseURL: os.Getenv("SUPABASE_STORAGE_PUBLIC_BASE_URL"),

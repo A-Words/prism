@@ -1,10 +1,12 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse } from "next/server"
 
+import { sanitizeRedirectTo } from "@/lib/auth/redirect"
+
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const code = url.searchParams.get("code")
-  const redirectTo = url.searchParams.get("redirectTo") ?? "/dashboard"
+  const redirectTo = sanitizeRedirectTo(url.searchParams.get("redirectTo"))
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -42,6 +44,7 @@ export async function GET(request: Request) {
     if (error) {
       const loginUrl = new URL("/login", url.origin)
       loginUrl.searchParams.set("error", error.message)
+      loginUrl.searchParams.set("redirectTo", redirectTo)
       return NextResponse.redirect(loginUrl)
     }
   }
