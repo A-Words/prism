@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { PathDagChart } from "@/components/learning-path/path-dag-chart"
 import { NodeDetailSheet } from "@/components/learning-path/node-detail-sheet"
@@ -31,17 +31,20 @@ export default function LearningPathPage() {
 
   const pathId = useMemo(() => path?.pathId ?? 0, [path])
 
-  const withToken = async <T,>(runner: (token: string) => Promise<T>) => {
-    const supabase = createClient()
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) {
-      throw new Error("未获取到登录凭证，请重新登录")
-    }
-    return runner(token)
-  }
+  const withToken = useCallback(
+    async function runWithToken<T>(runner: (token: string) => Promise<T>) {
+      const supabase = createClient()
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) {
+        throw new Error("未获取到登录凭证，请重新登录")
+      }
+      return runner(token)
+    },
+    []
+  )
 
-  const loadPath = async () => {
+  const loadPath = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
@@ -56,13 +59,13 @@ export default function LearningPathPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [subject, withToken])
 
   useEffect(() => {
     loadPath().catch(() => {
       setError("加载学习路径失败")
     })
-  }, [subject])
+  }, [loadPath])
 
   const submitAttempt = async () => {
     if (!pathId) {
