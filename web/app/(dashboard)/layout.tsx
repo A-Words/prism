@@ -1,3 +1,4 @@
+// app/(dashboard)/layout.tsx
 import { redirect } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 
@@ -38,18 +39,31 @@ export default async function DashboardLayout({
 }) {
     const supabase = await createClient()
     const { data, error } = await supabase.auth.getUser()
-    if (error || !data.user) {
-        redirect("/login")
+    
+    // 🚀 临时注释掉登录检查，方便开发
+    // if (error || !data.user) {
+    //     redirect("/login")
+    // }
+    
+    // 提供默认用户数据，防止报错
+    const defaultUser = {
+        id: 'dev-user',
+        email: 'dev@example.com',
+        user_metadata: {
+            full_name: '开发用户'
+        }
     }
-    const metadata = (data.user.user_metadata ?? {}) as Record<string, unknown>
+    
+    const user = data.user || defaultUser
+    const metadata = (user.user_metadata ?? {}) as Record<string, unknown>
     const avatar = typeof metadata.avatar_url === "string" ? metadata.avatar_url : ""
 
     return (
         <SidebarProvider>
             <AppSidebar
                 user={{
-                    name: getUserName(data.user),
-                    email: data.user.email ?? "",
+                    name: getUserName(user as User),
+                    email: user.email ?? "",
                     avatar,
                 }}
             />
