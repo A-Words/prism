@@ -42,10 +42,18 @@ def pgvector_search(query_embedding: list[float], top_k: int = 5) -> list[dict]:
     vec_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
 
     sql = """
-        SELECT id, title, content, embedding <-> %s::vector AS distance
-        FROM knowledge_points
-        WHERE embedding IS NOT NULL
-        ORDER BY embedding <-> %s::vector
+        SELECT id, title, content, distance, source FROM (
+            SELECT id, title, content, embedding <-> %s::vector AS distance, 'knowledge_point' AS source
+            FROM knowledge_points
+            WHERE embedding IS NOT NULL
+
+            UNION ALL
+
+            SELECT id, title, content, embedding <-> %s::vector AS distance, 'note' AS source
+            FROM notes
+            WHERE embedding IS NOT NULL
+        ) t
+        ORDER BY distance
         LIMIT %s
     """
 
@@ -64,6 +72,7 @@ def pgvector_search(query_embedding: list[float], top_k: int = 5) -> list[dict]:
                             "title": row[1],
                             "content": row[2] or "",
                             "score": round(score, 4),
+                            "source": row[4],
                         }
                     )
     except Exception as exc:

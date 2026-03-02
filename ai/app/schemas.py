@@ -132,7 +132,7 @@ class SearchResultItem(BaseModel):
     title: str
     content: str
     score: float
-
+    source: str = Field(default="knowledge_point")
 
 class SearchResponse(BaseModel):
     results: list[SearchResultItem]

@@ -79,12 +79,14 @@ def run_search(request: SearchRequest) -> SearchResponse:
                 title=f"与「{request.query}」相关的知识点",
                 content=f"这是一条与「{request.query}」高度相关的笔记内容。",
                 score=0.95,
+                source="knowledge_point",
             ),
             SearchResultItem(
                 id=2,
                 title=f"「{request.query}」的扩展知识",
                 content=f"这是关于「{request.query}」的补充说明和延伸阅读。",
                 score=0.82,
+                source="knowledge_point",
             ),
         ]
         return SearchResponse(results=mock_results[: request.top_k])
@@ -100,6 +102,7 @@ def run_search(request: SearchRequest) -> SearchResponse:
                 title=row["title"],
                 content=row["content"],
                 score=row["score"],
+                source=row.get("source", "knowledge_point"),
             )
             for row in rows
         ]
