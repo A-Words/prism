@@ -156,8 +156,8 @@ export async function getCurrentScene(token: string): Promise<GetCurrentSceneRes
 
 export async function getHealthAlerts(token: string, acknowledged?: boolean): Promise<HealthAlertDTO[]> {
   const params = acknowledged !== undefined ? `?acknowledged=${acknowledged}` : ""
-  const data = await request<{ alerts: HealthAlertDTO[] }>(`/health-alerts${params}`, { method: "GET" }, token)
-  return data.alerts
+  const data = await request<{ items: HealthAlertDTO[] }>(`/health-alerts${params}`, { method: "GET" }, token)
+  return data.items ?? []
 }
 
 export async function acknowledgeHealthAlert(token: string, alertId: number): Promise<AckAlertResponse> {
@@ -204,8 +204,8 @@ export async function createChatSession(token: string, title: string): Promise<C
 }
 
 export async function listChatSessions(token: string): Promise<ChatSessionDTO[]> {
-  const data = await request<{ sessions: ChatSessionDTO[] }>("/chat/sessions", { method: "GET" }, token)
-  return data.sessions
+  const data = await request<{ items: ChatSessionDTO[] }>("/chat/sessions", { method: "GET" }, token)
+  return data.items ?? []
 }
 
 export async function sendChatMessage(
@@ -226,8 +226,8 @@ export async function sendChatMessage(
 }
 
 export async function listChatMessages(token: string, sessionId: number): Promise<ChatMessageDTO[]> {
-  const data = await request<{ messages: ChatMessageDTO[] }>(`/chat/sessions/${sessionId}/messages`, { method: "GET" }, token)
-  return data.messages
+  const data = await request<{ items: ChatMessageDTO[] }>(`/chat/sessions/${sessionId}/messages`, { method: "GET" }, token)
+  return data.items ?? []
 }
 
 // ——— 智能笔记 ———
@@ -245,8 +245,8 @@ export async function createNote(token: string, payload: CreateNoteRequest): Pro
 }
 
 export async function listNotes(token: string): Promise<NoteDTO[]> {
-  const data = await request<{ notes: NoteDTO[] }>("/notes", { method: "GET" }, token)
-  return data.notes
+  const data = await request<{ items: NoteDTO[] }>("/notes", { method: "GET" }, token)
+  return data.items ?? []
 }
 
 export async function getNote(token: string, noteId: number): Promise<NoteDTO> {
