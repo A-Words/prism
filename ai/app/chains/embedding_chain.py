@@ -55,21 +55,55 @@ def run_embed(text: str) -> EmbedResponse:
 
 
 def run_search(request: SearchRequest) -> SearchResponse:
-    """语义搜索（演示版本：返回模拟结果，生产环境应查询 pgvector）。"""
-    # 演示模式：返回基于查询的模拟搜索结果
-    # 生产环境中应：1. embed query  2. 在 pgvector 中查询最近邻  3. 返回结果
-    mock_results = [
-        SearchResultItem(
-            id=1,
-            title=f"与「{request.query}」相关的知识点",
-            content=f"这是一条与「{request.query}」高度相关的笔记内容。",
-            score=0.95,
-        ),
-        SearchResultItem(
-            id=2,
-            title=f"「{request.query}」的扩展知识",
-            content=f"这是关于「{request.query}」的补充说明和延伸阅读。",
-            score=0.82,
-        ),
-    ]
-    return SearchResponse(results=mock_results[: request.top_k])
+    """语义搜索 — 先生成查询向量，再通过 pgvector 检索最近邻。
+    当数据库不可用时回退到空结果。"""
+    import logging
+    import os
+
+    logger = logging.getLogger(__name__)
+
+    # 1. 生成查询文本的 embedding
+    try:
+        embed_result = run_embed(request.query)
+        query_embedding = embed_result.embedding
+    except Exception as exc:
+        logger.warning("生成查询 embedding 失败，返回空结果: %s", exc)
+        return SearchResponse(results=[])
+
+    # 2. 检查是否配置了数据库连接
+    if not os.getenv("DATABASE_URL", ""):
+        logger.info("DATABASE_URL 未配置，回退到 mock 搜索结果")
+        mock_results = [
+            SearchResultItem(
+                id=1,
+                title=f"与「{request.query}」相关的知识点",
+                content=f"这是一条与「{request.query}」高度相关的笔记内容。",
+                score=0.95,
+            ),
+            SearchResultItem(
+                id=2,
+                title=f"「{request.query}」的扩展知识",
+                content=f"这是关于「{request.query}」的补充说明和延伸阅读。",
+                score=0.82,
+            ),
+        ]
+        return SearchResponse(results=mock_results[: request.top_k])
+
+    # 3. 通过 pgvector 执行语义搜索
+    try:
+        from app.db import pgvector_search
+
+        rows = pgvector_search(query_embedding, top_k=request.top_k)
+        results = [
+            SearchResultItem(
+                id=row["id"],
+                title=row["title"],
+                content=row["content"],
+                score=row["score"],
+            )
+            for row in rows
+        ]
+        return SearchResponse(results=results)
+    except Exception as exc:
+        logger.warning("pgvector 搜索失败，返回空结果: %s", exc)
+        return SearchResponse(results=[])
