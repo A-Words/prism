@@ -96,7 +96,10 @@ export default function HealthPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {summary ? Math.round(summary.avgFocusScore * 100) : "-"}%
+              {summary && summary.focusTrend.length > 0
+                ? Math.round((summary.focusTrend.reduce((s, p) => s + p.value, 0) / summary.focusTrend.length) * 100)
+                : "-"}
+              %
             </div>
             <p className="text-xs text-muted-foreground">
               基于最近学习会话分析
@@ -110,10 +113,13 @@ export default function HealthPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {summary ? Math.round(summary.avgFatigueLevel * 100) : "-"}%
+              {summary && summary.fatigueTrend.length > 0
+                ? Math.round((summary.fatigueTrend.reduce((s, p) => s + p.value, 0) / summary.fatigueTrend.length) * 100)
+                : "-"}
+              %
             </div>
             <p className="text-xs text-muted-foreground">
-              {summary?.avgFatigueLevel && summary.avgFatigueLevel > 0.7 ? "建议适当休息" : "状态良好"}
+              {summary && summary.fatigueTrend.length > 0 && (summary.fatigueTrend.reduce((s, p) => s + p.value, 0) / summary.fatigueTrend.length) > 0.7 ? "建议适当休息" : "状态良好"}
             </p>
           </CardContent>
         </Card>
@@ -124,7 +130,14 @@ export default function HealthPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {summary ? Math.round((summary.postureDistribution.good / (summary.postureDistribution.good + summary.postureDistribution.slouching + summary.postureDistribution.tooClose || 1)) * 100) : "-"}%
+              {summary && summary.postureDistribution.length > 0
+                ? (() => {
+                    const goodRatio = summary.postureDistribution.find((p) => p.status === "good")?.ratio ?? 0
+                    const total = summary.postureDistribution.reduce((s, p) => s + p.ratio, 0)
+                    return total > 0 ? Math.round((goodRatio / total) * 100) : "-"
+                  })()
+                : "-"}
+              %
             </div>
             <p className="text-xs text-muted-foreground">
               良好坐姿占比

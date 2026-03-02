@@ -131,7 +131,7 @@ export default function EmotionPage() {
             <div className="mt-4 border rounded-md p-4 bg-primary/5 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-lg">{intervention.action}</span>
-                <Badge variant={intervention.priority > 5 ? "destructive" : "default"}>优先级: {intervention.priority}</Badge>
+                <Badge variant={intervention.urgency === "high" ? "destructive" : "default"}>紧急度: {intervention.urgency}</Badge>
               </div>
               <p className="text-muted-foreground">{intervention.message}</p>
             </div>

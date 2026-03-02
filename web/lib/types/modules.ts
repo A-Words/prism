@@ -36,22 +36,19 @@ export type AckAlertResponse = {
 }
 
 export type TrendPoint = {
-  timestamp: string
+  ts: string
   value: number
 }
 
 export type PostureDistribution = {
-  good: number
-  slouching: number
-  tooClose: number
+  status: string
+  ratio: number
 }
 
 export type HealthSummaryResponse = {
-  avgFocusScore: number
-  avgFatigueLevel: number
   focusTrend: TrendPoint[]
   fatigueTrend: TrendPoint[]
-  postureDistribution: PostureDistribution
+  postureDistribution: PostureDistribution[]
 }
 
 // ——— 情绪干预 ———
@@ -71,7 +68,7 @@ export type InterventionEvalRequest = {
 export type InterventionEvalResponse = {
   action: InterventionAction
   message: string
-  priority: number
+  urgency: string
 }
 
 // ——— 虚拟助教 ———
