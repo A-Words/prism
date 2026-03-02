@@ -8,6 +8,7 @@ import (
 type Config struct {
 	Port                   string
 	AIServiceURL           string
+	DatabaseURL            string
 	SupabaseURL            string
 	SupabaseJWKSURL        string
 	SupabaseJWTIssuer      string
@@ -39,6 +40,7 @@ func Load() Config {
 	return Config{
 		Port:                   getEnv("PORT", "8080"),
 		AIServiceURL:           getEnv("AI_SERVICE_URL", "http://localhost:5000"),
+		DatabaseURL:            os.Getenv("DATABASE_URL"),
 		SupabaseURL:            supabaseURL,
 		SupabaseJWKSURL:        jwksURL,
 		SupabaseJWTIssuer:      jwtIssuer,
