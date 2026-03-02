@@ -32,7 +32,7 @@ export default function EmotionPage() {
   const loadScene = useCallback(async () => {
     try {
       const data = await withToken((t) => getCurrentScene(t))
-      setScene(data.scene); setStrategy(data.strategy)
+      setScene(data.currentScene); setStrategy(data.strategy)
     } catch (e) { console.error(e) }
   }, [withToken])
 
@@ -42,7 +42,7 @@ export default function EmotionPage() {
     setLoading(true); setError("")
     try {
       const data = await withToken((t) => switchScene(t, newScene))
-      setScene(data.scene); setStrategy(data.strategy); setIntervention(null)
+      setScene(data.currentScene); setStrategy(data.strategy); setIntervention(null)
     } catch (e) { setError(e instanceof Error ? e.message : "切换场景失败") }
     finally { setLoading(false) }
   }
@@ -83,8 +83,7 @@ export default function EmotionPage() {
           </div>
           {strategy && (
             <div className="bg-muted/50 p-3 rounded-md text-sm space-y-2">
-              <div className="flex gap-4"><span className="font-medium">UI: {strategy.uiMode}</span><span className="font-medium">AI: {strategy.aiTone}</span></div>
-              <div className="flex flex-wrap gap-2">{strategy.features.map((f, i) => <Badge key={i} variant="secondary">{f}</Badge>)}</div>
+              <div className="flex gap-4"><span className="font-medium">路径: {strategy.pathMode}</span><span className="font-medium">干预: {strategy.interventionLevel}</span><span className="font-medium">辅导: {strategy.tutorMode}</span></div>
             </div>
           )}
         </CardContent>

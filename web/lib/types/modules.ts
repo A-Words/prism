@@ -3,18 +3,18 @@
 export type SceneType = "classroom" | "self-study" | "exam-prep"
 
 export type SceneStrategy = {
-  uiMode: string
-  aiTone: string
-  features: string[]
+  pathMode: string
+  interventionLevel: string
+  tutorMode: string
 }
 
 export type SwitchSceneResponse = {
-  scene: SceneType
+  currentScene: SceneType
   strategy: SceneStrategy
 }
 
 export type GetCurrentSceneResponse = {
-  scene: SceneType
+  currentScene: SceneType
   strategy: SceneStrategy
 }
 
