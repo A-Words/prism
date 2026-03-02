@@ -37,6 +37,19 @@
 - **场景化支持**: 课堂同步记录 / 自习路径规划 / 考前薄弱点诊断
 - **无缝衔接**: 跨场景数据同步，保持学习状态连续性
 
+## 📚 文档导航（PRD）
+
+PRD 文档位于 `docs/` 目录：
+
+- [总体 PRD](docs/product-prd.md)
+- [模块 PRD：学习路径规划](docs/module-learning-path.md)
+- [模块 PRD：情绪干预](docs/module-emotion-intervention.md)
+- [模块 PRD：虚拟助教](docs/module-virtual-tutor.md)
+- [模块 PRD：智能笔记](docs/module-smart-notes.md)
+- [模块 PRD：健康管理](docs/module-health-management.md)
+- [模块 PRD：跨场景适配](docs/module-cross-scene-adaptation.md)
+- [演示 Runbook](docs/prd-demo-runbook.md)
+
 ## 🏗️ 系统架构
 
 本项目采用 Monorepo 结构，包含三个核心微服务：
@@ -127,6 +140,7 @@ prism/
 │   │   ├── speech/      # 语音处理
 │   │   └── vision/      # 视觉分析 (OCR, 姿态)
 │   └── chains/          # LangChain 逻辑链
+├── docs/                # 项目文档
 ├── docker-compose.yml   # 编排文件
 └── README.md            # 项目说明文档
 ```

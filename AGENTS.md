@@ -32,6 +32,26 @@ prism/
 5. **健康管理** — 专注度追踪、疲劳检测、姿态分析、休息建议（Vision API Pose, WebSocket）
 6. **跨场景适配** — 场景识别、场景策略、数据同步（前端状态机, Context API）
 
+## PRD 文档读取规则（按需求）
+
+处理需求时，Agent 必须按“最小必要”原则读取 `docs/` 中的 PRD 文档，避免无关上下文污染。
+
+### 基本规则
+
+1. 任何功能开发前，先读：`docs/product-prd.md`（冻结术语、全局边界、分期定义）。
+2. 然后只读与需求直接相关的模块 PRD（可 1~2 个），不要默认全量读取六个模块。
+3. 若需求涉及演示流程、答辩、回退策略，额外读取：`docs/prd-demo-runbook.md`。
+4. 当代码实现与 PRD 冲突时，先遵循用户当次明确需求；若用户未明确，则以 PRD 为默认基线并在回复中说明偏差。
+
+### 模块到文档映射
+
+- 学习路径规划：`docs/module-learning-path.md`
+- 情绪干预：`docs/module-emotion-intervention.md`
+- 虚拟助教：`docs/module-virtual-tutor.md`
+- 智能笔记：`docs/module-smart-notes.md`
+- 健康管理：`docs/module-health-management.md`
+- 跨场景适配：`docs/module-cross-scene-adaptation.md`
+
 ## 编码规范
 
 ### 通用规则
