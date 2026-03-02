@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -8,16 +9,30 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prism/server/internal/ai"
 	"github.com/prism/server/internal/config"
+	"github.com/prism/server/internal/db"
 	"github.com/prism/server/internal/handler"
 	"github.com/prism/server/internal/middleware"
 	"github.com/prism/server/internal/repository"
 	"github.com/prism/server/internal/service"
+	"github.com/prism/server/internal/ws"
 )
 
 func main() {
 	cfg := config.Load()
 
-	repo := repository.NewMemoryRepository()
+	// 根据是否配置 DATABASE_URL 决定使用内存仓储还是 PostgreSQL 仓储
+	var repo repository.Repository
+	if cfg.DatabaseURL != "" {
+		gormDB, err := db.Connect(cfg.DatabaseURL)
+		if err != nil {
+			log.Fatalf("数据库连接失败: %v", err)
+		}
+		repo = repository.NewPostgresRepository(gormDB)
+		log.Println("使用 PostgreSQL 仓储")
+	} else {
+		repo = repository.NewMemoryRepository()
+		log.Println("使用内存仓储（未配置 DATABASE_URL）")
+	}
 	aiClient := ai.NewHTTPClient(cfg.AIServiceURL)
 	learningService := service.NewLearningService(
 		repo,
@@ -40,6 +55,14 @@ func main() {
 
 	r := gin.Default()
 	r.Use(corsMiddleware())
+
+	ws.SetTokenValidator(func(token string) (string, error) {
+		return jwksValidator.ValidateToken(token)
+	})
+	wsHub := ws.NewHub()
+	go wsHub.Run(context.Background())
+	r.GET("/ws/monitor", ws.MonitorHandler(wsHub, learningService))
+	r.GET("/ws/assistant", ws.AssistantHandler(wsHub, learningService))
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{

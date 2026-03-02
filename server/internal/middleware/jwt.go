@@ -146,6 +146,64 @@ func (v *JWKSValidator) Middleware() gin.HandlerFunc {
 	}
 }
 
+func (v *JWKSValidator) ValidateToken(tokenString string) (string, error) {
+	tokenString = strings.TrimSpace(strings.TrimPrefix(tokenString, "Bearer "))
+	tokenString = strings.TrimSpace(strings.TrimPrefix(tokenString, "bearer "))
+	if tokenString == "" {
+		return "", errors.New("missing token")
+	}
+
+	claims := jwt.MapClaims{}
+	parser := jwt.NewParser(jwt.WithValidMethods([]string{
+		jwt.SigningMethodRS256.Alg(),
+		jwt.SigningMethodRS384.Alg(),
+		jwt.SigningMethodRS512.Alg(),
+		jwt.SigningMethodES256.Alg(),
+		jwt.SigningMethodES384.Alg(),
+		jwt.SigningMethodES512.Alg(),
+		jwt.SigningMethodEdDSA.Alg(),
+	}))
+	token, err := parser.ParseWithClaims(tokenString, claims, v.keyFunc)
+	if err != nil || !token.Valid {
+		return "", errors.New("invalid token")
+	}
+
+	subject, ok := claims["sub"].(string)
+	if !ok || strings.TrimSpace(subject) == "" {
+		return "", errors.New("invalid token subject")
+	}
+
+	expRaw, ok := claims["exp"]
+	if !ok {
+		return "", errors.New("missing token expiry")
+	}
+	expUnix, ok := toInt64(expRaw)
+	if !ok {
+		return "", errors.New("invalid token expiry")
+	}
+	if time.Now().UTC().Unix() >= expUnix {
+		return "", errors.New("token expired")
+	}
+
+	issuer, ok := claims["iss"].(string)
+	if !ok || strings.TrimSpace(issuer) == "" {
+		return "", errors.New("missing token issuer")
+	}
+	if issuer != v.issuer {
+		return "", errors.New("invalid token issuer")
+	}
+
+	audRaw, ok := claims["aud"]
+	if !ok {
+		return "", errors.New("missing token audience")
+	}
+	if !hasAudience(audRaw, v.audience) {
+		return "", errors.New("invalid token audience")
+	}
+
+	return subject, nil
+}
+
 func (v *JWKSValidator) keyFunc(token *jwt.Token) (any, error) {
 	if token == nil {
 		return nil, errors.New("nil token")
