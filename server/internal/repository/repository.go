@@ -38,4 +38,28 @@ type Repository interface {
 
 	SaveHomeworkUpload(upload model.HomeworkUpload) model.HomeworkUpload
 	SaveAssignment(assignment model.Assignment) model.Assignment
+
+	// 场景适配
+	GetUserScene(userID string) string
+	SetUserScene(userID string, scene string)
+
+	// 健康管理
+	CreateHealthAlert(alert model.HealthAlert) model.HealthAlert
+	ListHealthAlerts(userID string, acknowledged *bool) []model.HealthAlert
+	GetHealthAlert(userID string, alertID int) (model.HealthAlert, bool)
+	AcknowledgeHealthAlert(userID string, alertID int) (model.HealthAlert, bool)
+	CreateStudyLog(log model.StudyLog) model.StudyLog
+	ListStudyLogs(userID string, since time.Time) []model.StudyLog
+
+	// 虚拟助教
+	CreateChatSession(session model.ChatSession) model.ChatSession
+	ListChatSessions(userID string) []model.ChatSession
+	GetChatSession(userID string, sessionID int) (model.ChatSession, bool)
+	CreateChatMessage(message model.ChatMessage) model.ChatMessage
+	ListChatMessages(sessionID int) []model.ChatMessage
+
+	// 智能笔记
+	CreateNote(note model.Note) model.Note
+	ListNotes(userID string) []model.Note
+	GetNote(userID string, noteID int) (model.Note, bool)
 }

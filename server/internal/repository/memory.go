@@ -29,12 +29,31 @@ type MemoryRepository struct {
 	homeworkUploads map[int]model.HomeworkUpload
 	assignments     map[int]model.Assignment
 
+	// 场景适配
+	userScenes map[string]string
+
+	// 健康管理
+	healthAlerts map[int]model.HealthAlert
+	studyLogs    []model.StudyLog
+
+	// 虚拟助教
+	chatSessions map[int]model.ChatSession
+	chatMessages []model.ChatMessage
+
+	// 智能笔记
+	notes map[int]model.Note
+
 	nextSessionID    int
 	nextPathID       int
 	nextAttemptID    int
 	nextAdjustmentID int
 	nextUploadID     int
 	nextAssignmentID int
+	nextAlertID      int
+	nextStudyLogID   int
+	nextChatSessionID int
+	nextChatMessageID int
+	nextNoteID       int
 }
 
 func NewMemoryRepository() *MemoryRepository {
@@ -57,6 +76,17 @@ func NewMemoryRepository() *MemoryRepository {
 		nextAdjustmentID: 1,
 		nextUploadID:    1,
 		nextAssignmentID: 1,
+		userScenes:      make(map[string]string),
+		healthAlerts:    make(map[int]model.HealthAlert),
+		studyLogs:       make([]model.StudyLog, 0),
+		chatSessions:    make(map[int]model.ChatSession),
+		chatMessages:    make([]model.ChatMessage, 0),
+		notes:           make(map[int]model.Note),
+		nextAlertID:     1,
+		nextStudyLogID:  1,
+		nextChatSessionID: 1,
+		nextChatMessageID: 1,
+		nextNoteID:      1,
 	}
 	repo.seedKnowledgeData()
 	return repo
@@ -431,4 +461,194 @@ func clonePath(path model.LearningPath) model.LearningPath {
 		copyPath.SkippedNodeIDs[key] = value
 	}
 	return copyPath
+}
+
+// ==================== 场景适配 ====================
+
+func (r *MemoryRepository) GetUserScene(userID string) string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	scene, ok := r.userScenes[userID]
+	if !ok {
+		return string(model.SceneSelfStudy)
+	}
+	return scene
+}
+
+func (r *MemoryRepository) SetUserScene(userID string, scene string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.userScenes[userID] = scene
+}
+
+// ==================== 健康管理 ====================
+
+func (r *MemoryRepository) CreateHealthAlert(alert model.HealthAlert) model.HealthAlert {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	alert.ID = r.nextAlertID
+	r.nextAlertID++
+	r.healthAlerts[alert.ID] = alert
+	return alert
+}
+
+func (r *MemoryRepository) ListHealthAlerts(userID string, acknowledged *bool) []model.HealthAlert {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]model.HealthAlert, 0)
+	for _, alert := range r.healthAlerts {
+		if alert.UserID != userID {
+			continue
+		}
+		if acknowledged != nil && alert.Acknowledged != *acknowledged {
+			continue
+		}
+		result = append(result, alert)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.After(result[j].CreatedAt) })
+	return result
+}
+
+func (r *MemoryRepository) GetHealthAlert(userID string, alertID int) (model.HealthAlert, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	alert, ok := r.healthAlerts[alertID]
+	if !ok || alert.UserID != userID {
+		return model.HealthAlert{}, false
+	}
+	return alert, true
+}
+
+func (r *MemoryRepository) AcknowledgeHealthAlert(userID string, alertID int) (model.HealthAlert, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	alert, ok := r.healthAlerts[alertID]
+	if !ok || alert.UserID != userID {
+		return model.HealthAlert{}, false
+	}
+	alert.Acknowledged = true
+	alert.UpdatedAt = time.Now().UTC()
+	r.healthAlerts[alertID] = alert
+	return alert, true
+}
+
+func (r *MemoryRepository) CreateStudyLog(log model.StudyLog) model.StudyLog {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	log.ID = r.nextStudyLogID
+	r.nextStudyLogID++
+	r.studyLogs = append(r.studyLogs, log)
+	return log
+}
+
+func (r *MemoryRepository) ListStudyLogs(userID string, since time.Time) []model.StudyLog {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]model.StudyLog, 0)
+	for _, log := range r.studyLogs {
+		if log.UserID != userID {
+			continue
+		}
+		if log.CreatedAt.Before(since) {
+			continue
+		}
+		result = append(result, log)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.Before(result[j].CreatedAt) })
+	return result
+}
+
+// ==================== 虚拟助教 ====================
+
+func (r *MemoryRepository) CreateChatSession(session model.ChatSession) model.ChatSession {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	session.ID = r.nextChatSessionID
+	r.nextChatSessionID++
+	r.chatSessions[session.ID] = session
+	return session
+}
+
+func (r *MemoryRepository) ListChatSessions(userID string) []model.ChatSession {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]model.ChatSession, 0)
+	for _, session := range r.chatSessions {
+		if session.UserID == userID {
+			result = append(result, session)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].UpdatedAt.After(result[j].UpdatedAt) })
+	return result
+}
+
+func (r *MemoryRepository) GetChatSession(userID string, sessionID int) (model.ChatSession, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	session, ok := r.chatSessions[sessionID]
+	if !ok || session.UserID != userID {
+		return model.ChatSession{}, false
+	}
+	return session, true
+}
+
+func (r *MemoryRepository) CreateChatMessage(message model.ChatMessage) model.ChatMessage {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	message.ID = r.nextChatMessageID
+	r.nextChatMessageID++
+	r.chatMessages = append(r.chatMessages, message)
+	// 更新会话时间戳
+	if session, ok := r.chatSessions[message.SessionID]; ok {
+		session.UpdatedAt = message.CreatedAt
+		r.chatSessions[message.SessionID] = session
+	}
+	return message
+}
+
+func (r *MemoryRepository) ListChatMessages(sessionID int) []model.ChatMessage {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]model.ChatMessage, 0)
+	for _, msg := range r.chatMessages {
+		if msg.SessionID == sessionID {
+			result = append(result, msg)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.Before(result[j].CreatedAt) })
+	return result
+}
+
+// ==================== 智能笔记 ====================
+
+func (r *MemoryRepository) CreateNote(note model.Note) model.Note {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	note.ID = r.nextNoteID
+	r.nextNoteID++
+	r.notes[note.ID] = note
+	return note
+}
+
+func (r *MemoryRepository) ListNotes(userID string) []model.Note {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]model.Note, 0)
+	for _, note := range r.notes {
+		if note.UserID == userID {
+			result = append(result, note)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].UpdatedAt.After(result[j].UpdatedAt) })
+	return result
+}
+
+func (r *MemoryRepository) GetNote(userID string, noteID int) (model.Note, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	note, ok := r.notes[noteID]
+	if !ok || note.UserID != userID {
+		return model.Note{}, false
+	}
+	return note, true
 }

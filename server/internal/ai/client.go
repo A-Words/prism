@@ -17,6 +17,12 @@ type Client interface {
 	VisionOCR(ctx context.Context, req model.AIVisionOCRRequest) (model.AIVisionOCRResponse, error)
 	GradeHomework(ctx context.Context, req model.AIGradeHomeworkRequest) (model.AIGradeHomeworkResponse, error)
 	PredictOutcome(ctx context.Context, req model.AIPredictOutcomeRequest) (model.AIPredictOutcomeResponse, error)
+	AnalyzeEmotion(ctx context.Context, req model.AIEmotionAnalyzeRequest) (model.AIEmotionAnalyzeResponse, error)
+	AnalyzePose(ctx context.Context, req model.AIPoseAnalyzeRequest) (model.AIPoseAnalyzeResponse, error)
+	ChatCompletion(ctx context.Context, req model.AIChatCompletionRequest) (model.AIChatCompletionResponse, error)
+	Transcribe(ctx context.Context, req model.AITranscribeRequest) (model.AITranscribeResponse, error)
+	Embed(ctx context.Context, req model.AIEmbedRequest) (model.AIEmbedResponse, error)
+	Search(ctx context.Context, req model.AISearchRequest) (model.AISearchResponse, error)
 }
 
 type HTTPClient struct {
@@ -46,6 +52,42 @@ func (c *HTTPClient) GradeHomework(ctx context.Context, req model.AIGradeHomewor
 func (c *HTTPClient) PredictOutcome(ctx context.Context, req model.AIPredictOutcomeRequest) (model.AIPredictOutcomeResponse, error) {
 	var response model.AIPredictOutcomeResponse
 	err := c.postJSON(ctx, "/assessment/predict-outcome", req, &response)
+	return response, err
+}
+
+func (c *HTTPClient) AnalyzeEmotion(ctx context.Context, req model.AIEmotionAnalyzeRequest) (model.AIEmotionAnalyzeResponse, error) {
+	var response model.AIEmotionAnalyzeResponse
+	err := c.postJSON(ctx, "/analyze/emotion", req, &response)
+	return response, err
+}
+
+func (c *HTTPClient) AnalyzePose(ctx context.Context, req model.AIPoseAnalyzeRequest) (model.AIPoseAnalyzeResponse, error) {
+	var response model.AIPoseAnalyzeResponse
+	err := c.postJSON(ctx, "/analyze/pose", req, &response)
+	return response, err
+}
+
+func (c *HTTPClient) ChatCompletion(ctx context.Context, req model.AIChatCompletionRequest) (model.AIChatCompletionResponse, error) {
+	var response model.AIChatCompletionResponse
+	err := c.postJSON(ctx, "/chat/completions", req, &response)
+	return response, err
+}
+
+func (c *HTTPClient) Transcribe(ctx context.Context, req model.AITranscribeRequest) (model.AITranscribeResponse, error) {
+	var response model.AITranscribeResponse
+	err := c.postJSON(ctx, "/speech/transcribe", req, &response)
+	return response, err
+}
+
+func (c *HTTPClient) Embed(ctx context.Context, req model.AIEmbedRequest) (model.AIEmbedResponse, error) {
+	var response model.AIEmbedResponse
+	err := c.postJSON(ctx, "/embed", req, &response)
+	return response, err
+}
+
+func (c *HTTPClient) Search(ctx context.Context, req model.AISearchRequest) (model.AISearchResponse, error) {
+	var response model.AISearchResponse
+	err := c.postJSON(ctx, "/search", req, &response)
 	return response, err
 }
 

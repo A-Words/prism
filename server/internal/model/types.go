@@ -288,3 +288,313 @@ type AIPredictOutcomeResponse struct {
 	CalibrationFactor float64 `json:"calibrationFactor"`
 	Rationale         string  `json:"rationale"`
 }
+
+// ==================== 场景适配模块 ====================
+
+type SceneType string
+
+const (
+	SceneClassroom SceneType = "classroom"
+	SceneSelfStudy SceneType = "self-study"
+	SceneExamPrep  SceneType = "exam-prep"
+)
+
+// ValidScene 检查场景值是否合法
+func ValidScene(s string) bool {
+	switch SceneType(s) {
+	case SceneClassroom, SceneSelfStudy, SceneExamPrep:
+		return true
+	}
+	return false
+}
+
+type SceneStrategy struct {
+	PathMode          string `json:"pathMode"`
+	InterventionLevel string `json:"interventionLevel"`
+	TutorMode         string `json:"tutorMode"`
+}
+
+// SceneStrategyTemplates 场景策略模板（可配置，避免硬编码散落在前端）
+var SceneStrategyTemplates = map[SceneType]SceneStrategy{
+	SceneClassroom: {PathMode: "balanced", InterventionLevel: "low", TutorMode: "hint_first"},
+	SceneSelfStudy: {PathMode: "balanced", InterventionLevel: "medium", TutorMode: "mixed"},
+	SceneExamPrep:  {PathMode: "exam-sprint", InterventionLevel: "high", TutorMode: "mixed"},
+}
+
+type SwitchSceneRequest struct {
+	Scene string `json:"scene" binding:"required"`
+}
+
+type SwitchSceneResponse struct {
+	CurrentScene SceneType     `json:"currentScene"`
+	Strategy     SceneStrategy `json:"strategy"`
+	EffectiveAt  string        `json:"effectiveAt"`
+}
+
+type GetCurrentSceneResponse struct {
+	CurrentScene SceneType     `json:"currentScene"`
+	Strategy     SceneStrategy `json:"strategy"`
+}
+
+// ==================== 健康管理模块 ====================
+
+type HealthAlertType string
+
+const (
+	HealthAlertFatigue     HealthAlertType = "fatigue"
+	HealthAlertPosture     HealthAlertType = "posture"
+	HealthAlertBreakNeeded HealthAlertType = "break_needed"
+	HealthAlertStress      HealthAlertType = "stress"
+)
+
+type HealthAlert struct {
+	ID           int             `json:"id"`
+	UserID       string          `json:"-"`
+	AlertType    HealthAlertType `json:"alertType"`
+	Message      string          `json:"message"`
+	Acknowledged bool            `json:"acknowledged"`
+	CreatedAt    time.Time       `json:"createdAt"`
+	UpdatedAt    time.Time       `json:"updatedAt"`
+}
+
+type HealthAlertDTO struct {
+	ID           int    `json:"id"`
+	AlertType    string `json:"alertType"`
+	Message      string `json:"message"`
+	Acknowledged bool   `json:"acknowledged"`
+	CreatedAt    string `json:"createdAt"`
+}
+
+type AckAlertResponse struct {
+	ID           int    `json:"id"`
+	Acknowledged bool   `json:"acknowledged"`
+	UpdatedAt    string `json:"updatedAt"`
+}
+
+type StudyLog struct {
+	ID            int       `json:"id"`
+	UserID        string    `json:"-"`
+	Scene         string    `json:"scene"`
+	Emotion       string    `json:"emotion"`
+	FocusScore    float64   `json:"focusScore"`
+	FatigueLevel  float64   `json:"fatigueLevel"`
+	PostureStatus string    `json:"postureStatus"`
+	CreatedAt     time.Time `json:"createdAt"`
+}
+
+type TrendPoint struct {
+	Ts    string  `json:"ts"`
+	Value float64 `json:"value"`
+}
+
+type PostureDistribution struct {
+	Status string  `json:"status"`
+	Ratio  float64 `json:"ratio"`
+}
+
+type HealthSummaryResponse struct {
+	FocusTrend           []TrendPoint          `json:"focusTrend"`
+	FatigueTrend         []TrendPoint          `json:"fatigueTrend"`
+	PostureDistribution  []PostureDistribution `json:"postureDistribution"`
+}
+
+// ==================== 情绪干预模块 ====================
+
+type EmotionType string
+
+const (
+	EmotionFocused    EmotionType = "focused"
+	EmotionConfused   EmotionType = "confused"
+	EmotionAnxious    EmotionType = "anxious"
+	EmotionFrustrated EmotionType = "frustrated"
+	EmotionTired      EmotionType = "tired"
+)
+
+type InterventionAction string
+
+const (
+	InterventionAdjustDifficulty InterventionAction = "adjust_difficulty"
+	InterventionEncourage        InterventionAction = "encourage"
+	InterventionSuggestBreak     InterventionAction = "suggest_break"
+	InterventionPostureReminder  InterventionAction = "posture_reminder"
+)
+
+type InterventionEvalRequest struct {
+	Emotion       string  `json:"emotion" binding:"required"`
+	FocusScore    float64 `json:"focusScore"`
+	FatigueLevel  float64 `json:"fatigueLevel"`
+	PostureStatus string  `json:"postureStatus"`
+	Scene         string  `json:"scene"`
+}
+
+type InterventionEvalResponse struct {
+	Action  InterventionAction `json:"action"`
+	Message string             `json:"message"`
+	Urgency string             `json:"urgency"`
+}
+
+// ==================== AI 情绪/姿态分析 ====================
+
+type AIEmotionAnalyzeRequest struct {
+	Image string `json:"image"`
+	Audio string `json:"audio,omitempty"`
+}
+
+type AIEmotionAnalyzeResponse struct {
+	Emotion      string  `json:"emotion"`
+	Confidence   float64 `json:"confidence"`
+	FocusScore   float64 `json:"focusScore"`
+	FatigueLevel float64 `json:"fatigueLevel"`
+}
+
+type AIPoseAnalyzeRequest struct {
+	Image string `json:"image"`
+}
+
+type AIPoseAnalyzeResponse struct {
+	PostureStatus string  `json:"postureStatus"`
+	Confidence    float64 `json:"confidence"`
+	Details       string  `json:"details"`
+}
+
+// ==================== 虚拟助教模块 ====================
+
+type ChatSession struct {
+	ID        int       `json:"id"`
+	UserID    string    `json:"-"`
+	Title     string    `json:"title"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type ChatMessage struct {
+	ID                  int       `json:"id"`
+	SessionID           int       `json:"sessionId"`
+	Role                string    `json:"role"`
+	Content             string    `json:"content"`
+	RelatedKnowledgeIDs []int     `json:"relatedKnowledgeIds,omitempty"`
+	CreatedAt           time.Time `json:"createdAt"`
+}
+
+type ChatSessionDTO struct {
+	ID        int    `json:"id"`
+	Title     string `json:"title"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type ChatMessageDTO struct {
+	ID                  int    `json:"id"`
+	Role                string `json:"role"`
+	Content             string `json:"content"`
+	RelatedKnowledgeIDs []int  `json:"relatedKnowledgeIds,omitempty"`
+	CreatedAt           string `json:"createdAt"`
+}
+
+type CreateChatSessionRequest struct {
+	Title string `json:"title"`
+}
+
+type SendMessageRequest struct {
+	Content string `json:"content" binding:"required"`
+	Scene   string `json:"scene,omitempty"`
+}
+
+// ==================== AI 对话 ====================
+
+type AIChatCompletionRequest struct {
+	Messages []AIChatMessage `json:"messages"`
+	Scene    string          `json:"scene,omitempty"`
+	Stream   bool            `json:"stream"`
+}
+
+type AIChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type AIChatCompletionResponse struct {
+	Content             string `json:"content"`
+	RelatedKnowledgeIDs []int  `json:"relatedKnowledgeIds,omitempty"`
+}
+
+// ==================== 智能笔记模块 ====================
+
+type NoteSourceType string
+
+const (
+	NoteSourceManual        NoteSourceType = "manual"
+	NoteSourceVoice         NoteSourceType = "voice"
+	NoteSourceOCR           NoteSourceType = "ocr"
+	NoteSourceAutoGenerated NoteSourceType = "auto-generated"
+)
+
+type Note struct {
+	ID         int            `json:"id"`
+	UserID     string         `json:"-"`
+	Title      string         `json:"title"`
+	Content    string         `json:"content"`
+	SourceType NoteSourceType `json:"sourceType"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
+}
+
+type NoteDTO struct {
+	ID         int    `json:"id"`
+	Title      string `json:"title"`
+	Content    string `json:"content"`
+	SourceType string `json:"sourceType"`
+	CreatedAt  string `json:"createdAt"`
+	UpdatedAt  string `json:"updatedAt"`
+}
+
+type CreateNoteRequest struct {
+	Title      string `json:"title" binding:"required"`
+	Content    string `json:"content" binding:"required"`
+	SourceType string `json:"sourceType"`
+}
+
+// ==================== AI 笔记相关 ====================
+
+type AITranscribeRequest struct {
+	Audio  string `json:"audio"`
+	Format string `json:"format,omitempty"`
+}
+
+type AITranscribeResponse struct {
+	Text string `json:"text"`
+}
+
+type AIEmbedRequest struct {
+	Text string `json:"text"`
+}
+
+type AIEmbedResponse struct {
+	Embedding []float64 `json:"embedding"`
+}
+
+type AISearchRequest struct {
+	Query string `json:"query"`
+	TopK  int    `json:"topK"`
+}
+
+type AISearchResult struct {
+	ID       int     `json:"id"`
+	Title    string  `json:"title"`
+	Content  string  `json:"content"`
+	Score    float64 `json:"score"`
+}
+
+type AISearchResponse struct {
+	Results []AISearchResult `json:"results"`
+}
+
+// ==================== WebSocket 事件信封 ====================
+
+type WSEnvelope struct {
+	Event     string `json:"event"`
+	Timestamp string `json:"timestamp"`
+	TraceID   string `json:"traceId"`
+	SessionID string `json:"sessionId,omitempty"`
+	Payload   any    `json:"payload"`
+}

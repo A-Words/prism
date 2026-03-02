@@ -55,16 +55,40 @@ func main() {
 	api := r.Group("/api/v1")
 	api.Use(jwksValidator.Middleware())
 	{
+		// 学习路径规划模块
 		api.POST("/assessment/cold-start/sessions", h.CreateColdStartSession)
 		api.POST("/assessment/cold-start/sessions/:sessionId/submit", h.SubmitColdStartSession)
 		api.POST("/assessment/homework/grade", h.GradeHomework)
-
 		api.GET("/learning-paths/current", h.GetCurrentLearningPath)
 		api.POST("/learning-paths/:pathId/attempts", h.SubmitPracticeAttempt)
 		api.GET("/learning-paths/:pathId/prediction", h.GetPrediction)
-
 		api.GET("/knowledge-points", h.ListKnowledgePoints)
 		api.GET("/weaknesses", h.ListWeaknesses)
+
+		// 跨场景适配模块
+		api.PUT("/scene", h.SwitchScene)
+		api.GET("/scene", h.GetCurrentScene)
+
+		// 健康管理模块
+		api.GET("/health-alerts", h.ListHealthAlerts)
+		api.POST("/health-alerts/:alertId/ack", h.AcknowledgeHealthAlert)
+		api.GET("/health-summary", h.GetHealthSummary)
+
+		// 情绪干预模块
+		api.POST("/intervention/evaluate", h.EvaluateIntervention)
+
+		// 虚拟助教模块
+		api.POST("/chat/sessions", h.CreateChatSession)
+		api.GET("/chat/sessions", h.ListChatSessions)
+		api.POST("/chat/sessions/:sessionId/messages", h.SendMessage)
+		api.GET("/chat/sessions/:sessionId/messages", h.ListChatMessages)
+
+		// 智能笔记模块
+		api.POST("/notes", h.CreateNote)
+		api.GET("/notes", h.ListNotes)
+		api.GET("/notes/:noteId", h.GetNote)
+		api.POST("/notes/transcribe", h.TranscribeAudio)
+		api.GET("/notes/search", h.SearchNotes)
 	}
 
 	log.Printf("Server starting on :%s", cfg.Port)
@@ -81,7 +105,7 @@ func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
