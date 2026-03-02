@@ -1,13 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Send, Plus, MessageSquare, Loader2, Bot, User } from "lucide-react"
+import { Send, Plus, MessageSquare, Loader2, Bot, User, Wifi, WifiOff } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
 import {
   createChatSession,
   listChatSessions,
-  sendChatMessage,
   listChatMessages,
 } from "@/lib/api/client"
 import { ChatSessionDTO, ChatMessageDTO, SceneType } from "@/lib/types/modules"
@@ -15,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-
+import { useAssistantWs } from "@/hooks/use-assistant-ws"
 
 export default function AssistantPage() {
   // State
@@ -25,8 +24,8 @@ export default function AssistantPage() {
   const [inputValue, setInputValue] = useState("")
   const [scene, setScene] = useState<SceneType>("self-study")
   const [loading, setLoading] = useState(false)
-  const [sending, setSending] = useState(false)
   const [error, setError] = useState("")
+  const [token, setToken] = useState<string | null>(null)
 
   // Refs for auto-scroll
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -35,10 +34,26 @@ export default function AssistantPage() {
   const withToken = useCallback(async function runWithToken<T>(runner: (token: string) => Promise<T>) {
     const supabase = createClient()
     const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (!token) throw new Error("未获取到登录凭证，请重新登录")
-    return runner(token)
+    const t = data.session?.access_token
+    if (!t) throw new Error("未获取到登录凭证，请重新登录")
+    return runner(t)
   }, [])
+
+  // Load token
+  useEffect(() => {
+    createClient().auth.getSession().then(({ data }) => {
+      setToken(data.session?.access_token || null)
+    })
+  }, [])
+
+  const handleMessageComplete = useCallback((message: ChatMessageDTO) => {
+    setMessages((prev) => [...prev, message])
+  }, [])
+
+  const { isConnected, sendMessage, isStreaming, streamingContent, connect, disconnect } = useAssistantWs({
+    token: token || undefined,
+    onMessageComplete: handleMessageComplete
+  })
 
   // Load sessions on mount
   useEffect(() => {
@@ -54,11 +69,10 @@ export default function AssistantPage() {
     }
   }, [currentSessionId])
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change or streaming updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-
-  }, [messages])
+  }, [messages, streamingContent, isStreaming])
 
   const loadSessions = async () => {
     try {
@@ -99,16 +113,14 @@ export default function AssistantPage() {
   }
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !currentSessionId) return
+    if (!inputValue.trim() || !currentSessionId || !isConnected) return
 
     const content = inputValue
     setInputValue("")
-    setSending(true)
 
-    // Optimistic update
-    const tempId = Date.now()
+    // Optimistic update for user message
     const tempMessage: ChatMessageDTO = {
-      id: tempId,
+      id: Date.now(), // Temp ID
       sessionId: currentSessionId,
       role: "user",
       content: content,
@@ -118,19 +130,12 @@ export default function AssistantPage() {
     setMessages((prev) => [...prev, tempMessage])
 
     try {
-      const response = await withToken((token) => 
-        sendChatMessage(token, currentSessionId, content, scene)
-      )
-      // Replace optimistic message with real response
-      setMessages((prev) => prev.map((msg) => (msg.id === tempId ? response : msg)))
+      sendMessage(currentSessionId, content, scene)
     } catch (err) {
       setError("发送消息失败")
-      // Remove optimistic message on error
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempId))
-    } finally {
-      setSending(false)
+      // Remove optimistic message on error? 
+      // Actually sendMessage is void, errors are handled via WS events or try/catch if send fails immediately
     }
-
   }
 
   return (
@@ -180,17 +185,22 @@ export default function AssistantPage() {
             {currentSessionId && <Badge variant="outline">会话 #{currentSessionId}</Badge>}
           </div>
           
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">当前场景:</span>
-            <select
-              className="h-8 rounded-md border bg-background px-2 text-sm"
-              value={scene}
-              onChange={(e) => setScene(e.target.value as SceneType)}
-            >
-              <option value="classroom">课堂同步</option>
-              <option value="self-study">自主学习</option>
-              <option value="exam-prep">考前复习</option>
-            </select>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground" title={isConnected ? "已连接" : "未连接"}>
+              {isConnected ? <Wifi className="h-4 w-4 text-green-500" /> : <WifiOff className="h-4 w-4 text-destructive" />}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">当前场景:</span>
+              <select
+                className="h-8 rounded-md border bg-background px-2 text-sm"
+                value={scene}
+                onChange={(e) => setScene(e.target.value as SceneType)}
+              >
+                <option value="classroom">课堂同步</option>
+                <option value="self-study">自主学习</option>
+                <option value="exam-prep">考前复习</option>
+              </select>
+            </div>
           </div>
         </CardHeader>
 
@@ -202,40 +212,54 @@ export default function AssistantPage() {
                 <Bot className="h-12 w-12 mb-2 opacity-20" />
                 <p>选择或创建一个会话开始提问</p>
               </div>
-            ) : messages.length === 0 ? (
+            ) : messages.length === 0 && !isStreaming ? (
               <div className="text-center text-sm text-muted-foreground py-8">
                 还没有消息，试着问个问题吧...
               </div>
             ) : (
-              messages.map((msg, idx) => {
-                const isUser = msg.role === "user"
-                return (
-                  <div
-                    key={msg.id || idx}
-                    className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}
-                  >
-                    {!isUser && (
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Bot className="h-4 w-4 text-primary" />
-                      </div>
-                    )}
+              <>
+                {messages.map((msg, idx) => {
+                  const isUser = msg.role === "user"
+                  return (
                     <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${
-                        isUser
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+                      key={msg.id || idx}
+                      className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}
                     >
-                      {msg.content}
-                    </div>
-                    {isUser && (
-                      <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-                        <User className="h-4 w-4 text-secondary-foreground" />
+                      {!isUser && (
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Bot className="h-4 w-4 text-primary" />
+                        </div>
+                      )}
+                      <div
+                        className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${
+                          isUser
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {msg.content}
                       </div>
-                    )}
+                      {isUser && (
+                        <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
+                          <User className="h-4 w-4 text-secondary-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                {/* Streaming Message Bubble */}
+                {isStreaming && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="max-w-[80%] rounded-lg px-4 py-2 text-sm bg-muted text-muted-foreground">
+                      {streamingContent}
+                      <span className="inline-block w-1.5 h-4 ml-1 align-middle bg-primary animate-pulse" />
+                    </div>
                   </div>
-                )
-              })
+                )}
+              </>
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -247,12 +271,12 @@ export default function AssistantPage() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                placeholder="输入你的问题..."
-                disabled={!currentSessionId || sending}
+                placeholder={isConnected ? "输入你的问题..." : "连接中..."}
+                disabled={!currentSessionId || isStreaming || !isConnected}
                 className="flex-1"
               />
-              <Button onClick={handleSendMessage} disabled={!currentSessionId || sending || !inputValue.trim()}>
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <Button onClick={handleSendMessage} disabled={!currentSessionId || isStreaming || !inputValue.trim() || !isConnected}>
+                {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 <span className="ml-2 hidden sm:inline">发送</span>
               </Button>
             </div>
