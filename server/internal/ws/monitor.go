@@ -19,7 +19,17 @@ type TokenValidatorFunc func(token string) (string, error)
 var (
 	tokenValidatorMu sync.RWMutex
 	tokenValidator   TokenValidatorFunc
+	monitorStateMu   sync.RWMutex
+	monitorState     = make(map[string]userMonitorState)
 )
+
+type userMonitorState struct {
+	LastImage        string
+	LastScene        string
+	LastPosture      string
+	LastFocusScore   float64
+	LastFatigueLevel float64
+}
 
 func SetTokenValidator(validator TokenValidatorFunc) {
 	tokenValidatorMu.Lock()
@@ -54,7 +64,7 @@ func handleMonitorEnvelope(client *Client, svc *service.LearningService, userID 
 	case "video_frame":
 		handleVideoFrame(client, svc, userID, envelope)
 	case "audio_chunk":
-		client.Send(buildEnvelope("audio_chunk", envelope.TraceID, envelope.SessionID, map[string]any{"status": "received"}))
+		handleAudioChunk(client, svc, userID, envelope)
 	default:
 		client.Send(buildEnvelope("error", envelope.TraceID, envelope.SessionID, map[string]any{"message": "unsupported event"}))
 	}
@@ -110,6 +120,13 @@ func handleVideoFrame(client *Client, svc *service.LearningService, userID strin
 	client.Send(buildEnvelope("pose_result", envelope.TraceID, envelope.SessionID, poseResp))
 
 	_ = svc.CreateStudyLog(ctx, userID, scene, emotionResp.Emotion, emotionResp.FocusScore, emotionResp.FatigueLevel, poseResp.PostureStatus)
+	setUserMonitorState(userID, userMonitorState{
+		LastImage:        image,
+		LastScene:        scene,
+		LastPosture:      poseResp.PostureStatus,
+		LastFocusScore:   emotionResp.FocusScore,
+		LastFatigueLevel: emotionResp.FatigueLevel,
+	})
 
 	if emotionResp.FatigueLevel > 0.7 {
 		alert := svc.CreateHealthAlert(ctx, userID, string(model.HealthAlertFatigue), "检测到疲劳水平较高，建议短暂休息")
@@ -119,6 +136,85 @@ func handleVideoFrame(client *Client, svc *service.LearningService, userID strin
 	if poseResp.PostureStatus == "slouching" || poseResp.PostureStatus == "too_close" {
 		alert := svc.CreateHealthAlert(ctx, userID, string(model.HealthAlertPosture), "检测到坐姿异常，请调整坐姿")
 		client.Send(buildEnvelope("health_alert", envelope.TraceID, envelope.SessionID, alert))
+	}
+
+	interventionResp, interventionErr := svc.EvaluateIntervention(ctx, model.InterventionEvalRequest{
+		Emotion:       emotionResp.Emotion,
+		FocusScore:    emotionResp.FocusScore,
+		FatigueLevel:  emotionResp.FatigueLevel,
+		PostureStatus: poseResp.PostureStatus,
+		Scene:         scene,
+	})
+	if interventionErr == nil {
+		client.Send(buildEnvelope("intervention_result", envelope.TraceID, envelope.SessionID, interventionResp))
+	}
+}
+
+func handleAudioChunk(client *Client, svc *service.LearningService, userID string, envelope model.WSEnvelope) {
+	payload, ok := toMap(envelope.Payload)
+	if !ok {
+		client.Send(buildEnvelope("error", envelope.TraceID, envelope.SessionID, map[string]any{"message": "invalid payload"}))
+		return
+	}
+
+	audio := strings.TrimSpace(toString(payload["audio"]))
+	if audio == "" {
+		client.Send(buildEnvelope("error", envelope.TraceID, envelope.SessionID, map[string]any{"message": "audio is required"}))
+		return
+	}
+
+	state := getUserMonitorState(userID)
+	image := strings.TrimSpace(toString(payload["image"]))
+	scene := strings.TrimSpace(toString(payload["scene"]))
+	if image == "" {
+		image = state.LastImage
+	}
+	if scene == "" {
+		scene = state.LastScene
+	}
+	if image == "" {
+		client.Send(buildEnvelope("audio_chunk", envelope.TraceID, envelope.SessionID, map[string]any{
+			"status": "buffered",
+			"reason": "no image context",
+		}))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	defer cancel()
+
+	emotionResp, emotionErr := svc.AnalyzeEmotion(ctx, model.AIEmotionAnalyzeRequest{Image: image, Audio: audio})
+	if emotionErr != nil {
+		client.Send(buildEnvelope("error", envelope.TraceID, envelope.SessionID, map[string]any{"message": fmt.Sprintf("analyze emotion failed: %v", emotionErr)}))
+		return
+	}
+
+	setUserMonitorState(userID, userMonitorState{
+		LastImage:        image,
+		LastScene:        scene,
+		LastPosture:      state.LastPosture,
+		LastFocusScore:   emotionResp.FocusScore,
+		LastFatigueLevel: emotionResp.FatigueLevel,
+	})
+
+	client.Send(buildEnvelope("audio_chunk", envelope.TraceID, envelope.SessionID, map[string]any{"status": "analyzed"}))
+	client.Send(buildEnvelope("emotion_result", envelope.TraceID, envelope.SessionID, emotionResp))
+
+	_ = svc.CreateStudyLog(ctx, userID, scene, emotionResp.Emotion, emotionResp.FocusScore, emotionResp.FatigueLevel, state.LastPosture)
+	if emotionResp.FatigueLevel > 0.7 {
+		alert := svc.CreateHealthAlert(ctx, userID, string(model.HealthAlertFatigue), "检测到疲劳水平较高，建议短暂休息")
+		client.Send(buildEnvelope("health_alert", envelope.TraceID, envelope.SessionID, alert))
+	}
+
+	interventionResp, interventionErr := svc.EvaluateIntervention(ctx, model.InterventionEvalRequest{
+		Emotion:       emotionResp.Emotion,
+		FocusScore:    emotionResp.FocusScore,
+		FatigueLevel:  emotionResp.FatigueLevel,
+		PostureStatus: state.LastPosture,
+		Scene:         scene,
+	})
+	if interventionErr == nil {
+		client.Send(buildEnvelope("intervention_result", envelope.TraceID, envelope.SessionID, interventionResp))
 	}
 }
 
@@ -168,6 +264,22 @@ func toString(value any) string {
 	default:
 		return ""
 	}
+}
+
+func getUserMonitorState(userID string) userMonitorState {
+	monitorStateMu.RLock()
+	defer monitorStateMu.RUnlock()
+	state, ok := monitorState[userID]
+	if !ok {
+		return userMonitorState{}
+	}
+	return state
+}
+
+func setUserMonitorState(userID string, next userMonitorState) {
+	monitorStateMu.Lock()
+	defer monitorStateMu.Unlock()
+	monitorState[userID] = next
 }
 
 func toInt(value any) (int, bool) {

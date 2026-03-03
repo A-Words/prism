@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/prism/server/internal/model"
@@ -63,6 +64,97 @@ func (s *LearningService) SearchNotes(ctx context.Context, query string, topK in
 		topK = 10
 	}
 	return s.ai.Search(ctx, model.AISearchRequest{Query: query, TopK: topK})
+}
+
+// OCRNote 调用 OCR 识别并直接落库笔记，同时建立知识点关联
+func (s *LearningService) OCRNote(ctx context.Context, userID string, title string, imageBase64 string, task string) (model.OCRNoteResponse, error) {
+	imageBase64 = strings.TrimSpace(imageBase64)
+	if imageBase64 == "" {
+		return model.OCRNoteResponse{}, errors.New("image is required")
+	}
+	if strings.TrimSpace(task) == "" {
+		task = "handwriting"
+	}
+
+	ocrResp, err := s.ai.VisionOCR(ctx, model.AIVisionOCRRequest{
+		Image: imageBase64,
+		Task:  task,
+	})
+	if err != nil {
+		return model.OCRNoteResponse{}, fmt.Errorf("ocr note: %w", err)
+	}
+
+	finalTitle := strings.TrimSpace(title)
+	if finalTitle == "" {
+		finalTitle = buildOCRNoteTitle(ocrResp.Text)
+	}
+	if finalTitle == "" {
+		finalTitle = "OCR 笔记"
+	}
+
+	now := time.Now().UTC()
+	note := s.repo.CreateNote(model.Note{
+		UserID:     userID,
+		Title:      finalTitle,
+		Content:    strings.TrimSpace(ocrResp.Text),
+		SourceType: model.NoteSourceOCR,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	})
+
+	searchResp, searchErr := s.ai.Search(ctx, model.AISearchRequest{
+		Query: strings.TrimSpace(ocrResp.Text),
+		TopK:  5,
+	})
+	if searchErr != nil {
+		return model.OCRNoteResponse{
+			Note:                noteToDTO(note),
+			Structured:          ocrResp.Structured,
+			RelatedKnowledgeIDs: []int{},
+		}, nil
+	}
+
+	// 仅保留知识点来源的结果，避免把 note 自身命中误当成知识图谱关联
+	knowledgeIDs := make([]int, 0, len(searchResp.Results))
+	knowledgeLinks := make([]model.NoteKnowledgeLink, 0, len(searchResp.Results))
+	seen := make(map[int]bool)
+	for _, result := range searchResp.Results {
+		if result.ID <= 0 || result.Source != "knowledge_point" || seen[result.ID] {
+			continue
+		}
+		seen[result.ID] = true
+		knowledgeIDs = append(knowledgeIDs, result.ID)
+		knowledgeLinks = append(knowledgeLinks, model.NoteKnowledgeLink{
+			NoteID:         note.ID,
+			KnowledgeID:    result.ID,
+			RelevanceScore: result.Score,
+		})
+	}
+	s.repo.SaveNoteKnowledgeLinks(note.ID, knowledgeLinks)
+
+	return model.OCRNoteResponse{
+		Note:                noteToDTO(note),
+		Structured:          ocrResp.Structured,
+		RelatedKnowledgeIDs: knowledgeIDs,
+	}, nil
+}
+
+func buildOCRNoteTitle(content string) string {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return ""
+	}
+	for _, separator := range []string{"\n", "。", ".", "；", ";", "?"} {
+		if idx := strings.Index(trimmed, separator); idx > 0 {
+			trimmed = strings.TrimSpace(trimmed[:idx])
+			break
+		}
+	}
+	runes := []rune(trimmed)
+	if len(runes) > 24 {
+		return string(runes[:24])
+	}
+	return trimmed
 }
 
 func noteToDTO(note model.Note) model.NoteDTO {

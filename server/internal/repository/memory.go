@@ -41,7 +41,8 @@ type MemoryRepository struct {
 	chatMessages []model.ChatMessage
 
 	// 智能笔记
-	notes map[int]model.Note
+	notes              map[int]model.Note
+	noteKnowledgeLinks map[int][]model.NoteKnowledgeLink
 
 	nextSessionID    int
 	nextPathID       int
@@ -87,6 +88,7 @@ func NewMemoryRepository() *MemoryRepository {
 		nextChatSessionID: 1,
 		nextChatMessageID: 1,
 		nextNoteID:      1,
+		noteKnowledgeLinks: make(map[int][]model.NoteKnowledgeLink),
 	}
 	repo.seedKnowledgeData()
 	return repo
@@ -651,4 +653,23 @@ func (r *MemoryRepository) GetNote(userID string, noteID int) (model.Note, bool)
 		return model.Note{}, false
 	}
 	return note, true
+}
+
+func (r *MemoryRepository) SaveNoteKnowledgeLinks(noteID int, links []model.NoteKnowledgeLink) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(links) == 0 {
+		r.noteKnowledgeLinks[noteID] = []model.NoteKnowledgeLink{}
+		return
+	}
+	cloned := make([]model.NoteKnowledgeLink, 0, len(links))
+	for _, link := range links {
+		cloned = append(cloned, model.NoteKnowledgeLink{
+			NoteID:         noteID,
+			KnowledgeID:    link.KnowledgeID,
+			RelevanceScore: link.RelevanceScore,
+		})
+	}
+	r.noteKnowledgeLinks[noteID] = cloned
 }

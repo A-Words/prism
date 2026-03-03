@@ -460,6 +460,29 @@ func (r *PostgresRepository) GetNote(userID string, noteID int) (model.Note, boo
 	return toModelNote(row), true
 }
 
+func (r *PostgresRepository) SaveNoteKnowledgeLinks(noteID int, links []model.NoteKnowledgeLink) {
+	if noteID <= 0 {
+		return
+	}
+	_ = r.db.Where("note_id = ?", noteID).Delete(&db.NoteKnowledgeLinkModel{}).Error
+	if len(links) == 0 {
+		return
+	}
+
+	rows := make([]db.NoteKnowledgeLinkModel, 0, len(links))
+	for _, link := range links {
+		rows = append(rows, db.NoteKnowledgeLinkModel{
+			NoteID:         noteID,
+			KnowledgeID:    link.KnowledgeID,
+			RelevanceScore: link.RelevanceScore,
+		})
+	}
+	_ = r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "note_id"}, {Name: "knowledge_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"relevance_score"}),
+	}).Create(&rows).Error
+}
+
 func toModelKnowledgePoint(row db.KnowledgePointModel) model.KnowledgePoint {
 	return model.KnowledgePoint{
 		ID:      row.ID,

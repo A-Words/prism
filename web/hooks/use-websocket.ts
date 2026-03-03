@@ -35,6 +35,7 @@ export function useWebSocket({
   const socketRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const reconnectAttemptsRef = useRef(0)
+  const connectRef = useRef<() => void>(() => {})
   
   // Base URL calculation
   const getWsUrl = useCallback(() => {
@@ -104,7 +105,7 @@ export function useWebSocket({
           reconnectAttemptsRef.current += 1
           
           reconnectTimeoutRef.current = setTimeout(() => {
-            connect()
+            connectRef.current()
           }, timeout)
         }
       }
@@ -126,6 +127,10 @@ export function useWebSocket({
       console.error("WebSocket connection error:", e)
     }
   }, [getWsUrl, onMessage, onOpen, onClose, onError, autoConnect, token])
+
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -149,11 +154,18 @@ export function useWebSocket({
 
   // Initial connection effect
   useEffect(() => {
+    let connectTimer: NodeJS.Timeout | undefined
     if (autoConnect && token) {
-      connect()
+      // 避免在 effect 同步阶段直接触发状态更新
+      connectTimer = setTimeout(() => {
+        connect()
+      }, 0)
     }
     
     return () => {
+      if (connectTimer) {
+        clearTimeout(connectTimer)
+      }
       disconnect()
     }
   }, [connect, disconnect, autoConnect, token])
@@ -164,6 +176,5 @@ export function useWebSocket({
     readyState,
     connect,
     disconnect,
-    socket: socketRef.current
   }
 }

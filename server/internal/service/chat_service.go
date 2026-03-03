@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/prism/server/internal/model"
@@ -70,11 +71,18 @@ func (s *LearningService) SendMessage(ctx context.Context, userID string, sessio
 		})
 	}
 
+	knowledgeContext := ""
+	searchResp, searchErr := s.ai.Search(ctx, model.AISearchRequest{Query: content, TopK: 3})
+	if searchErr == nil {
+		knowledgeContext = buildKnowledgeContext(searchResp.Results)
+	}
+
 	// 调用 AI 对话服务
 	aiResp, err := s.ai.ChatCompletion(ctx, model.AIChatCompletionRequest{
-		Messages: aiMessages,
-		Scene:    scene,
-		Stream:   false,
+		Messages:         aiMessages,
+		Scene:            scene,
+		KnowledgeContext: knowledgeContext,
+		Stream:           false,
 	})
 	if err != nil {
 		return model.ChatMessageDTO{}, fmt.Errorf("ai chat: %w", err)
@@ -117,4 +125,21 @@ func (s *LearningService) ListChatMessages(_ context.Context, userID string, ses
 		})
 	}
 	return result, nil
+}
+
+func buildKnowledgeContext(results []model.AISearchResult) string {
+	if len(results) == 0 {
+		return ""
+	}
+	var builder strings.Builder
+	for index, result := range results {
+		if index > 0 {
+			builder.WriteString("\n\n")
+		}
+		builder.WriteString("标题：")
+		builder.WriteString(strings.TrimSpace(result.Title))
+		builder.WriteString("\n内容：")
+		builder.WriteString(strings.TrimSpace(result.Content))
+	}
+	return builder.String()
 }

@@ -133,3 +133,9 @@ export type SearchResultItem = {
 export type SearchResponse = {
   results: SearchResultItem[]
 }
+
+export type OCRNoteResponse = {
+  note: NoteDTO
+  structured: Record<string, unknown>
+  relatedKnowledgeIds: number[]
+}

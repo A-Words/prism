@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { createNote, listNotes, searchNotes, transcribeAudio } from "@/lib/api/client"
+import { createNote, listNotes, ocrNote, searchNotes, transcribeAudio } from "@/lib/api/client"
 import { NoteDTO, NoteSourceType, SearchResultItem } from "@/lib/types/modules"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +19,9 @@ export default function NotesPage() {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [sourceType, setSourceType] = useState<NoteSourceType>("manual")
+  const [ocrFile, setOcrFile] = useState<File | null>(null)
+  const [ocring, setOcring] = useState(false)
+  const [ocrHint, setOcrHint] = useState("")
   const [error, setError] = useState("")
 
   const withToken = useCallback(async function runWithToken<T>(runner: (token: string) => Promise<T>) {
@@ -89,6 +92,29 @@ export default function NotesPage() {
     }
   }
 
+  const handleOCRUpload = async () => {
+    if (!ocrFile) return
+    try {
+      setOcring(true)
+      const formData = new FormData()
+      formData.set("file", ocrFile)
+      if (title.trim()) {
+        formData.set("title", title.trim())
+      }
+      formData.set("task", "handwriting")
+      const res = await withToken((token) => ocrNote(token, formData))
+      setTitle(res.note.title)
+      setContent(res.note.content)
+      setSourceType("ocr")
+      setOcrHint(`已关联知识点 ${res.relatedKnowledgeIds.length} 个`)
+      await loadNotes()
+    } catch (_err) {
+      setError("OCR 入库失败")
+    } finally {
+      setOcring(false)
+    }
+  }
+
   const getBadgeColor = (type: NoteSourceType) => {
     switch (type) {
       case "voice": return "bg-blue-500"
@@ -156,6 +182,13 @@ export default function NotesPage() {
               <option value="voice">语音录入</option>
               <option value="ocr">OCR 识别</option>
             </select>
+            <div className="space-y-2">
+              <Input type="file" accept="image/*" onChange={(e) => setOcrFile(e.target.files?.[0] ?? null)} />
+              <Button variant="outline" className="w-full" onClick={handleOCRUpload} disabled={ocring || !ocrFile}>
+                {ocring ? "OCR 处理中..." : "上传图片并 OCR 入库"}
+              </Button>
+              {ocrHint ? <p className="text-xs text-muted-foreground">{ocrHint}</p> : null}
+            </div>
             <Button className="w-full" onClick={handleCreate} disabled={loading || !title || !content}>
               <Plus className="mr-2 h-4 w-4" /> {loading ? "保存中..." : "保存笔记"}
             </Button>

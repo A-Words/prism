@@ -1,6 +1,11 @@
 from fastapi.testclient import TestClient
 
-from app.schemas import HomeworkGradeResponse, PredictOutcomeResponse, VisionOCRResponse
+from app.schemas import (
+    EmotionAnalyzeResponse,
+    HomeworkGradeResponse,
+    PredictOutcomeResponse,
+    VisionOCRResponse,
+)
 from main import app
 
 
@@ -71,3 +76,25 @@ def test_provider_error_path():
     response = client.post("/vision/ocr", json={"image": "x", "task": "handwriting"})
     # 没有配置 API key 时必须失败，不允许本地回退。
     assert response.status_code in (200, 502)
+
+
+def test_analyze_emotion_schema(monkeypatch):
+    def fake_run(_client, _image, _audio):
+        return EmotionAnalyzeResponse.model_validate(
+            {
+                "emotion": "focused",
+                "confidence": 0.92,
+                "focusScore": 0.88,
+                "fatigueLevel": 0.2,
+                "details": {"signal": "stable"},
+            }
+        )
+
+    monkeypatch.setattr("app.routers.analyze.run_emotion_chain", fake_run)
+    monkeypatch.setattr("app.routers.analyze.OpenAICompatibleClient", lambda: object())
+
+    response = client.post("/analyze/emotion", json={"image": "base64", "audio": "audio-base64"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["focusScore"] == 0.88
+    assert body["fatigueLevel"] == 0.2

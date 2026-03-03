@@ -66,6 +66,8 @@ class EmotionAnalyzeRequest(BaseModel):
 class EmotionAnalyzeResponse(BaseModel):
     emotion: str
     confidence: float
+    focus_score: float = Field(alias="focusScore")
+    fatigue_level: float = Field(alias="fatigueLevel")
     details: dict[str, Any]
 
 

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { useWebSocket, WSEnvelope } from "./use-websocket"
-import { EmotionType, HealthAlertDTO } from "@/lib/types/modules"
+import { EmotionType, HealthAlertDTO, InterventionEvalResponse } from "@/lib/types/modules"
 
 interface EmotionResult {
   emotion: EmotionType
@@ -24,6 +24,7 @@ interface UseMonitorWsOptions {
 export function useMonitorWs({ token, onHealthAlert }: UseMonitorWsOptions) {
   const [emotionResult, setEmotionResult] = useState<EmotionResult | null>(null)
   const [poseResult, setPoseResult] = useState<PoseResult | null>(null)
+  const [interventionResult, setInterventionResult] = useState<InterventionEvalResponse | null>(null)
   const [isConnected, setIsConnected] = useState(false)
 
   const handleMessage = useCallback((envelope: WSEnvelope) => {
@@ -38,6 +39,9 @@ export function useMonitorWs({ token, onHealthAlert }: UseMonitorWsOptions) {
         if (onHealthAlert) {
           onHealthAlert(envelope.payload as HealthAlertDTO)
         }
+        break
+      case "intervention_result":
+        setInterventionResult(envelope.payload as InterventionEvalResponse)
         break
       default:
         // console.log("Unknown monitor event:", envelope.event)
@@ -77,5 +81,6 @@ export function useMonitorWs({ token, onHealthAlert }: UseMonitorWsOptions) {
     sendVideoFrame,
     emotionResult,
     poseResult,
+    interventionResult,
   }
 }

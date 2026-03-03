@@ -31,6 +31,43 @@ func (f fakeAIClient) PredictOutcome(_ context.Context, _ model.AIPredictOutcome
 	return model.AIPredictOutcomeResponse{CalibrationFactor: 1.0, Rationale: "stable"}, nil
 }
 
+func (f fakeAIClient) AnalyzeEmotion(_ context.Context, _ model.AIEmotionAnalyzeRequest) (model.AIEmotionAnalyzeResponse, error) {
+	return model.AIEmotionAnalyzeResponse{
+		Emotion:      "focused",
+		Confidence:   0.9,
+		FocusScore:   0.8,
+		FatigueLevel: 0.2,
+	}, nil
+}
+
+func (f fakeAIClient) AnalyzePose(_ context.Context, _ model.AIPoseAnalyzeRequest) (model.AIPoseAnalyzeResponse, error) {
+	return model.AIPoseAnalyzeResponse{
+		PostureStatus: "good",
+		Confidence:    0.9,
+		Details:       map[string]any{"status": "good"},
+	}, nil
+}
+
+func (f fakeAIClient) ChatCompletion(_ context.Context, _ model.AIChatCompletionRequest) (model.AIChatCompletionResponse, error) {
+	return model.AIChatCompletionResponse{Content: "ok", RelatedKnowledgeIDs: []int{101}}, nil
+}
+
+func (f fakeAIClient) Transcribe(_ context.Context, _ model.AITranscribeRequest) (model.AITranscribeResponse, error) {
+	return model.AITranscribeResponse{Text: "转写文本"}, nil
+}
+
+func (f fakeAIClient) Embed(_ context.Context, _ model.AIEmbedRequest) (model.AIEmbedResponse, error) {
+	return model.AIEmbedResponse{Embedding: []float64{0.1, 0.2}}, nil
+}
+
+func (f fakeAIClient) Search(_ context.Context, _ model.AISearchRequest) (model.AISearchResponse, error) {
+	return model.AISearchResponse{
+		Results: []model.AISearchResult{
+			{ID: 101, Title: "有理数运算", Content: "内容", Score: 0.9, Source: "knowledge_point"},
+		},
+	}, nil
+}
+
 func newTestService() *LearningService {
 	repo := repository.NewMemoryRepository()
 	return NewLearningService(repo, fakeAIClient{}, "https://example.supabase.co", "service-key", "bucket", "https://cdn.example.com")

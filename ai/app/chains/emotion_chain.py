@@ -9,6 +9,8 @@ from app.schemas import EmotionAnalyzeResponse
 class EmotionResult(BaseModel):
     emotion: str
     confidence: float
+    focusScore: float
+    fatigueLevel: float
     details: dict[str, object]
 
 
@@ -21,12 +23,14 @@ def run_emotion_chain(
         "根据学生面部图像分析当前情绪状态。"
         "emotion 只能是以下之一：focused, confused, anxious, frustrated, tired。"
         "confidence 为 0.0-1.0 之间的浮点数。"
+        "focusScore 为 0.0-1.0 的专注度分值。"
+        "fatigueLevel 为 0.0-1.0 的疲劳度分值。"
         "details 包含分析依据的关键特征。"
     )
     user_prompt = f"image_base64=\n{image_base64[:8000]}\n"
     if audio_base64:
         user_prompt += f"audio_base64=\n{audio_base64[:4000]}\n"
-    user_prompt += "请输出 JSON，包含 emotion, confidence, details 字段。"
+    user_prompt += "请输出 JSON，包含 emotion, confidence, focusScore, fatigueLevel, details 字段。"
 
     result = client.generate_structured(
         system_prompt=system_prompt,
@@ -35,8 +39,12 @@ def run_emotion_chain(
         vision=True,
     )
     parsed = EmotionResult.model_validate(result)
-    return EmotionAnalyzeResponse(
-        emotion=parsed.emotion,
-        confidence=parsed.confidence,
-        details=parsed.details,
+    return EmotionAnalyzeResponse.model_validate(
+        {
+            "emotion": parsed.emotion,
+            "confidence": parsed.confidence,
+            "focusScore": parsed.focusScore,
+            "fatigueLevel": parsed.fatigueLevel,
+            "details": parsed.details,
+        }
     )

@@ -62,5 +62,6 @@ func autoMigrate(db *gorm.DB) error {
 		&ChatSessionModel{},
 		&ChatMessageModel{},
 		&NoteModel{},
+		&NoteKnowledgeLinkModel{},
 	)
 }

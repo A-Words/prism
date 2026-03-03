@@ -39,6 +39,39 @@ func (f fakeAI) PredictOutcome(_ context.Context, _ model.AIPredictOutcomeReques
 	return model.AIPredictOutcomeResponse{CalibrationFactor: 1, Rationale: "ok"}, nil
 }
 
+func (f fakeAI) AnalyzeEmotion(_ context.Context, _ model.AIEmotionAnalyzeRequest) (model.AIEmotionAnalyzeResponse, error) {
+	return model.AIEmotionAnalyzeResponse{
+		Emotion:      "focused",
+		Confidence:   0.9,
+		FocusScore:   0.8,
+		FatigueLevel: 0.1,
+	}, nil
+}
+
+func (f fakeAI) AnalyzePose(_ context.Context, _ model.AIPoseAnalyzeRequest) (model.AIPoseAnalyzeResponse, error) {
+	return model.AIPoseAnalyzeResponse{
+		PostureStatus: "good",
+		Confidence:    0.95,
+		Details:       map[string]any{"status": "good"},
+	}, nil
+}
+
+func (f fakeAI) ChatCompletion(_ context.Context, _ model.AIChatCompletionRequest) (model.AIChatCompletionResponse, error) {
+	return model.AIChatCompletionResponse{Content: "ok"}, nil
+}
+
+func (f fakeAI) Transcribe(_ context.Context, _ model.AITranscribeRequest) (model.AITranscribeResponse, error) {
+	return model.AITranscribeResponse{Text: "ok"}, nil
+}
+
+func (f fakeAI) Embed(_ context.Context, _ model.AIEmbedRequest) (model.AIEmbedResponse, error) {
+	return model.AIEmbedResponse{Embedding: []float64{0.1}}, nil
+}
+
+func (f fakeAI) Search(_ context.Context, _ model.AISearchRequest) (model.AISearchResponse, error) {
+	return model.AISearchResponse{Results: []model.AISearchResult{}}, nil
+}
+
 func setupRouter(t *testing.T) (*gin.Engine, *rsa.PrivateKey, string) {
 	t.Helper()
 
@@ -66,6 +99,7 @@ func setupRouter(t *testing.T) (*gin.Engine, *rsa.PrivateKey, string) {
 	api.POST("/assessment/cold-start/sessions", h.CreateColdStartSession)
 	api.POST("/assessment/cold-start/sessions/:sessionId/submit", h.SubmitColdStartSession)
 	api.GET("/learning-paths/current", h.GetCurrentLearningPath)
+	api.POST("/notes/ocr", h.OCRNote)
 	return r, privateKey, kid
 }
 
@@ -129,6 +163,27 @@ func TestColdStartEndpointFlow(t *testing.T) {
 	r.ServeHTTP(getResp, getReq)
 	if getResp.Code != http.StatusOK {
 		t.Fatalf("get path failed: %d %s", getResp.Code, getResp.Body.String())
+	}
+}
+
+func TestOCRNoteRejectsInvalidTask(t *testing.T) {
+	r, privateKey, kid := setupRouter(t)
+	token := authToken(privateKey, kid)
+
+	payload := map[string]string{
+		"image": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+		"title": "OCR test",
+		"task":  "free-text-task",
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/notes/ocr", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", resp.Code, resp.Body.String())
 	}
 }
 

@@ -62,4 +62,5 @@ type Repository interface {
 	CreateNote(note model.Note) model.Note
 	ListNotes(userID string) []model.Note
 	GetNote(userID string, noteID int) (model.Note, bool)
+	SaveNoteKnowledgeLinks(noteID int, links []model.NoteKnowledgeLink)
 }

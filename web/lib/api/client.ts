@@ -24,6 +24,7 @@ import {
   CreateNoteRequest,
   TranscribeResponse,
   SearchResponse,
+  OCRNoteResponse,
 } from "@/lib/types/modules"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1"
@@ -260,6 +261,17 @@ export async function transcribeAudio(token: string, audio: string, format: stri
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ audio, format }),
+    },
+    token
+  )
+}
+
+export async function ocrNote(token: string, formData: FormData): Promise<OCRNoteResponse> {
+  return request<OCRNoteResponse>(
+    "/notes/ocr",
+    {
+      method: "POST",
+      body: formData,
     },
     token
   )

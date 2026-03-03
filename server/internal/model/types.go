@@ -452,9 +452,9 @@ type AIPoseAnalyzeRequest struct {
 }
 
 type AIPoseAnalyzeResponse struct {
-	PostureStatus string  `json:"postureStatus"`
-	Confidence    float64 `json:"confidence"`
-	Details       string  `json:"details"`
+	PostureStatus string         `json:"postureStatus"`
+	Confidence    float64        `json:"confidence"`
+	Details       map[string]any `json:"details"`
 }
 
 // ==================== 虚拟助教模块 ====================
@@ -503,9 +503,10 @@ type SendMessageRequest struct {
 // ==================== AI 对话 ====================
 
 type AIChatCompletionRequest struct {
-	Messages []AIChatMessage `json:"messages"`
-	Scene    string          `json:"scene,omitempty"`
-	Stream   bool            `json:"stream"`
+	Messages         []AIChatMessage `json:"messages"`
+	Scene            string          `json:"scene,omitempty"`
+	KnowledgeContext string          `json:"knowledgeContext,omitempty"`
+	Stream           bool            `json:"stream"`
 }
 
 type AIChatMessage struct {
@@ -539,6 +540,12 @@ type Note struct {
 	UpdatedAt  time.Time      `json:"updatedAt"`
 }
 
+type NoteKnowledgeLink struct {
+	NoteID         int
+	KnowledgeID    int
+	RelevanceScore float64
+}
+
 type NoteDTO struct {
 	ID         int    `json:"id"`
 	Title      string `json:"title"`
@@ -552,6 +559,12 @@ type CreateNoteRequest struct {
 	Title      string `json:"title" binding:"required"`
 	Content    string `json:"content" binding:"required"`
 	SourceType string `json:"sourceType"`
+}
+
+type OCRNoteResponse struct {
+	Note                NoteDTO        `json:"note"`
+	Structured          map[string]any `json:"structured"`
+	RelatedKnowledgeIDs []int          `json:"relatedKnowledgeIds"`
 }
 
 // ==================== AI 笔记相关 ====================
@@ -579,10 +592,11 @@ type AISearchRequest struct {
 }
 
 type AISearchResult struct {
-	ID       int     `json:"id"`
-	Title    string  `json:"title"`
-	Content  string  `json:"content"`
-	Score    float64 `json:"score"`
+	ID      int     `json:"id"`
+	Title   string  `json:"title"`
+	Content string  `json:"content"`
+	Score   float64 `json:"score"`
+	Source  string  `json:"source,omitempty"`
 }
 
 type AISearchResponse struct {

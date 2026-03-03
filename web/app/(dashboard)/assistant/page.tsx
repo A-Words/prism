@@ -8,6 +8,8 @@ import {
   createChatSession,
   listChatSessions,
   listChatMessages,
+  getCurrentScene,
+  switchScene,
 } from "@/lib/api/client"
 import { ChatSessionDTO, ChatMessageDTO, SceneType } from "@/lib/types/modules"
 import { Button } from "@/components/ui/button"
@@ -50,15 +52,50 @@ export default function AssistantPage() {
     setMessages((prev) => [...prev, message])
   }, [])
 
-  const { isConnected, sendMessage, isStreaming, streamingContent, connect, disconnect } = useAssistantWs({
+  const { isConnected, sendMessage, isStreaming, streamingContent } = useAssistantWs({
     token: token || undefined,
-    onMessageComplete: handleMessageComplete
+    onMessageComplete: handleMessageComplete,
+    onError: (message) => setError(message),
   })
 
-  // Load sessions on mount
+  const loadSessions = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await withToken((token) => listChatSessions(token))
+      setSessions(data)
+      if (data.length > 0 && !currentSessionId) {
+        setCurrentSessionId(data[0].id)
+      }
+    } catch {
+      setError("加载会话列表失败")
+    } finally {
+      setLoading(false)
+    }
+  }, [withToken, currentSessionId])
+
+  const loadMessages = useCallback(async (sessionId: number) => {
+    try {
+      const data = await withToken((token) => listChatMessages(token, sessionId))
+      setMessages(data)
+    } catch {
+      setError("加载消息记录失败")
+    }
+  }, [withToken])
+
+  const loadScene = useCallback(async () => {
+    try {
+      const data = await withToken((token) => getCurrentScene(token))
+      setScene(data.currentScene)
+    } catch {
+      setError("加载场景失败")
+    }
+  }, [withToken])
+
+  // Load sessions and scene on mount
   useEffect(() => {
     loadSessions()
-  }, [])
+    loadScene()
+  }, [loadSessions, loadScene])
 
   // Load messages when session changes
   useEffect(() => {
@@ -67,45 +104,31 @@ export default function AssistantPage() {
     } else {
       setMessages([])
     }
-  }, [currentSessionId])
+  }, [currentSessionId, loadMessages])
 
   // Auto-scroll to bottom when messages change or streaming updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
   }, [messages, streamingContent, isStreaming])
 
-  const loadSessions = async () => {
+  const handleSceneChange = useCallback(async (value: SceneType) => {
+    setScene(value)
     try {
-      setLoading(true)
-      const data = await withToken((token) => listChatSessions(token))
-      setSessions(data)
-      if (data.length > 0 && !currentSessionId) {
-        setCurrentSessionId(data[0].id)
-      }
-    } catch (err) {
-      setError("加载会话列表失败")
-    } finally {
-      setLoading(false)
+      const data = await withToken((token) => switchScene(token, value))
+      setScene(data.currentScene)
+    } catch {
+      setError("切换场景失败")
     }
-  }
-
-  const loadMessages = async (sessionId: number) => {
-    try {
-      const data = await withToken((token) => listChatMessages(token, sessionId))
-      setMessages(data)
-    } catch (err) {
-      setError("加载消息记录失败")
-    }
-  }
+  }, [withToken])
 
   const handleCreateSession = async () => {
     try {
       setLoading(true)
       const title = `新的辅导会话 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
       const newSession = await withToken((token) => createChatSession(token, title))
-      setSessions([newSession, ...sessions])
+      setSessions((prev) => [newSession, ...prev])
       setCurrentSessionId(newSession.id)
-    } catch (err) {
+    } catch {
       setError("创建会话失败")
     } finally {
       setLoading(false)
@@ -131,12 +154,22 @@ export default function AssistantPage() {
 
     try {
       sendMessage(currentSessionId, content, scene)
-    } catch (err) {
+    } catch {
       setError("发送消息失败")
       // Remove optimistic message on error? 
       // Actually sendMessage is void, errors are handled via WS events or try/catch if send fails immediately
     }
   }
+
+  useEffect(() => {
+    const refreshScene = () => {
+      void loadScene()
+    }
+    window.addEventListener("focus", refreshScene)
+    return () => {
+      window.removeEventListener("focus", refreshScene)
+    }
+  }, [loadScene])
 
   return (
     <div className="flex h-[calc(100vh-6rem)] gap-4">
@@ -194,7 +227,7 @@ export default function AssistantPage() {
               <select
                 className="h-8 rounded-md border bg-background px-2 text-sm"
                 value={scene}
-                onChange={(e) => setScene(e.target.value as SceneType)}
+                onChange={(e) => void handleSceneChange(e.target.value as SceneType)}
               >
                 <option value="classroom">课堂同步</option>
                 <option value="self-study">自主学习</option>

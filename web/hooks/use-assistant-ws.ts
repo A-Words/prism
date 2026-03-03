@@ -7,13 +7,13 @@ import { ChatMessageDTO, SceneType } from "@/lib/types/modules"
 interface UseAssistantWsOptions {
   token?: string
   onMessageComplete?: (message: ChatMessageDTO) => void
+  onError?: (message: string) => void
 }
 
-export function useAssistantWs({ token, onMessageComplete }: UseAssistantWsOptions) {
+export function useAssistantWs({ token, onMessageComplete, onError }: UseAssistantWsOptions) {
   const [streamingContent, setStreamingContent] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
   const [lastCompletedMessage, setLastCompletedMessage] = useState<ChatMessageDTO | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
 
   const handleMessage = useCallback((envelope: WSEnvelope) => {
     switch (envelope.event) {
@@ -41,16 +41,18 @@ export function useAssistantWs({ token, onMessageComplete }: UseAssistantWsOptio
         }
         break
       case "error":
+        const errorText =
+          (envelope.payload as { message?: string })?.message ||
+          "助教暂时不可用，请稍后重试。"
         console.error("Assistant WS Error:", envelope.payload)
         setIsStreaming(false)
+        onError?.(errorText)
         break
       default:
         break
     }
-  }, [onMessageComplete])
+  }, [onMessageComplete, onError])
 
-  const handleOpen = useCallback(() => setIsConnected(true), [])
-  const handleClose = useCallback(() => setIsConnected(false), [])
   const { send, connect, disconnect, readyState } = useWebSocket({
     url: "/ws/assistant",
     token,
@@ -76,8 +78,12 @@ export function useAssistantWs({ token, onMessageComplete }: UseAssistantWsOptio
         scene
       }
     }
-    send(envelope)
-  }, [send])
+    const sent = send(envelope)
+    if (!sent) {
+      setIsStreaming(false)
+      onError?.("连接已断开，消息发送失败，请重试。")
+    }
+  }, [send, onError])
 
   return {
     isConnected: readyState === WebSocket.OPEN,

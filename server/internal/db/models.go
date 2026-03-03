@@ -341,3 +341,14 @@ type NoteModel struct {
 }
 
 func (NoteModel) TableName() string { return "notes" }
+
+// NoteKnowledgeLinkModel 笔记与知识点关联
+type NoteKnowledgeLinkModel struct {
+	ID             int       `gorm:"primaryKey;autoIncrement"`
+	NoteID         int       `gorm:"index;not null"`
+	KnowledgeID    int       `gorm:"index;not null"`
+	RelevanceScore float64   `gorm:"type:float;not null;default:0"`
+	CreatedAt      time.Time `gorm:"autoCreateTime"`
+}
+
+func (NoteKnowledgeLinkModel) TableName() string { return "note_knowledge_links" }

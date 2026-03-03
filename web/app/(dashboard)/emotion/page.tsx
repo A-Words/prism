@@ -7,7 +7,6 @@ import { SceneType, SceneStrategy, InterventionEvalResponse, EmotionType, Health
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Activity, Brain, Zap, Play, Square, AlertTriangle, X } from "lucide-react"
 import { useMonitorWs } from "@/hooks/use-monitor-ws"
 
@@ -33,7 +32,7 @@ export default function EmotionPage() {
   const [token, setToken] = useState<string | null>(null)
   const [isMonitoring, setIsMonitoring] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  let alertIdCounter = useRef(0)
+  const alertIdCounter = useRef(0)
 
   // Fetch token once
   useEffect(() => {
@@ -49,7 +48,7 @@ export default function EmotionPage() {
     setTimeout(() => setHealthAlerts(prev => prev.filter(a => a.id !== id)), 5000)
   }, [])
 
-  const { isConnected, connect, disconnect, sendVideoFrame, emotionResult, poseResult } = useMonitorWs({
+  const { isConnected, connect, disconnect, sendVideoFrame, emotionResult, poseResult, interventionResult } = useMonitorWs({
     token: token || undefined,
     onHealthAlert: handleHealthAlert
   })
@@ -68,6 +67,12 @@ export default function EmotionPage() {
       setRealTimePosture(poseResult.status)
     }
   }, [poseResult])
+
+  useEffect(() => {
+    if (interventionResult) {
+      setIntervention(interventionResult)
+    }
+  }, [interventionResult])
 
   const loadScene = useCallback(async () => {
     if (!token) return
@@ -270,4 +275,3 @@ export default function EmotionPage() {
     </>
   )
 }
-

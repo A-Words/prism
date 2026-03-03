@@ -110,6 +110,7 @@ func main() {
 		api.POST("/notes", h.CreateNote)
 		api.GET("/notes", h.ListNotes)
 		api.GET("/notes/:noteId", h.GetNote)
+		api.POST("/notes/ocr", h.OCRNote)
 		api.POST("/notes/transcribe", h.TranscribeAudio)
 		api.GET("/notes/search", h.SearchNotes)
 	}
