@@ -18,6 +18,7 @@ coverage/
 *.test
 apps/bff/bin/
 apps/bff/.cache/
+apps/bff/apps/bff/data/prism.db
 
 # Rust/Tauri
 apps/desktop/src-tauri/target/
