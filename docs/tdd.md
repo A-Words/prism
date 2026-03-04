@@ -594,7 +594,7 @@ erDiagram
 4. 采用 Shadcn 全量引入，但要求业务只通过 `Prism*` 封装层调用。
 
 ### 15.3 Shadcn 风险控制
-1. 组件治理：维护 `ui/components-manifest.md`，登记启用组件与用途。
+1. 组件治理：维护 `docs/ui-components-manifest.md`，登记启用组件与用途。
 2. 包体积控制：路由分包 + Tree Shaking + 对 `Command`/`Dialog` 组合动态加载。
 3. 样式一致性：颜色、圆角、间距统一由 CSS Variables 提供，禁止业务页硬编码。
 4. 二次封装：禁止业务直接散用原子组件，统一通过 `Prism*` 组件出口。
@@ -679,7 +679,7 @@ erDiagram
 1. UAT 10 项是否全部通过。
 2. 告警阈值与降级开关是否可运行验证。
 3. 回滚路径是否完成演练。
-4. `ui/components-manifest.md` 是否与实际组件使用一致。
+4. `docs/ui-components-manifest.md` 是否与实际组件使用一致。
 
 ## 附录 C：Design Token 约束（架构级）
 1. 采用 CSS Variables token 化，配合主题注入机制，不在 TDD 固定具体色值/阴影/圆角参数。
@@ -688,7 +688,7 @@ erDiagram
 4. 具体 token 值与命名规范沉淀到 Design System 文档，不在本 TDD 维护。
 
 ## 附录 D：Shadcn 治理策略摘要
-1. 组件清单以 `ui/components-manifest.md` 为唯一事实来源。
+1. 组件清单以 `docs/ui-components-manifest.md` 为唯一事实来源。
 2. TDD 仅约束治理原则，不维护逐组件映射表。
 3. 业务代码仅通过 `Prism*` 封装层使用 UI 组件，禁止散用原子组件。
 4. 高成本组件按需加载，组件变更必须同步更新 manifest。
@@ -709,3 +709,4 @@ erDiagram
 3. 业务 API 路径与语义不变，仅扩展认证与观测约定。
 4. 新增规范必须先更新 TDD，再进入实现。
 5. MVP 不引入额外重型基础设施（如消息队列）。
+

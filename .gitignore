@@ -29,3 +29,9 @@ apps/desktop/src-tauri/target/
 # IDE
 .vscode/
 .idea/
+
+# TypeScript build info
+**/tsconfig.tsbuildinfo
+apps/bff/data/*.db
+apps/bff/apps/bff/data/*.db
+
