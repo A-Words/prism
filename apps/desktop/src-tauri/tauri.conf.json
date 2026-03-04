@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Prism",
+  "version": "0.1.0",
+  "identifier": "com.prism.app",
+  "build": {
+    "beforeDevCommand": "bun --cwd ../../web dev",
+    "beforeBuildCommand": "bun --cwd ../../web build",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../../web/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Prism Focus Space",
+        "width": 1440,
+        "height": 900,
+        "resizable": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": []
+  }
+}

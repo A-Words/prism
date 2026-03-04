@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@prism/contracts": ["packages/contracts/src/index.ts"],
+      "@prism/ui": ["packages/ui/src/index.tsx"]
+    }
+  }
+}

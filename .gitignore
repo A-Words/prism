@@ -1,0 +1,30 @@
+# Node
+node_modules/
+.bun/
+
+# Build
+dist/
+build/
+coverage/
+.playwright/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Go
+*.exe
+*.test
+apps/bff/bin/
+apps/bff/.cache/
+
+# Rust/Tauri
+apps/desktop/src-tauri/target/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/

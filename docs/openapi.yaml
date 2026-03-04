@@ -1,0 +1,54 @@
+openapi: 3.1.0
+info:
+  title: Prism Local BFF API
+  version: 1.0.0
+servers:
+  - url: http://127.0.0.1:{port}
+    variables:
+      port:
+        default: "8787"
+paths:
+  /api/v1/explore/text:
+    post:
+      summary: 文本探索
+  /api/v1/explore/image:
+    post:
+      summary: 图片探索
+  /api/v1/notes/{nodeId}:
+    get:
+      summary: 获取节点笔记
+    put:
+      summary: 保存节点笔记
+  /api/v1/notes/{nodeId}/stream:
+    get:
+      summary: 流式生成节点讲解
+  /api/v1/vision/analyze:
+    post:
+      summary: 状态标签分析
+  /api/v1/intervention/evaluate:
+    post:
+      summary: 干预判定
+  /api/v1/sync/push:
+    post:
+      summary: 推送离线队列
+  /api/v1/sync/pull:
+    post:
+      summary: 拉取增量变更
+components:
+  schemas:
+    ApiSuccessEnvelope:
+      type: object
+      properties:
+        request_id: { type: string }
+        data: { type: object }
+        meta: { type: object }
+    ApiErrorEnvelope:
+      type: object
+      properties:
+        request_id: { type: string }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            retryable: { type: boolean }

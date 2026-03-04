@@ -1,0 +1,12 @@
+{
+  "name": "@prism/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "bunx tauri dev",
+    "build": "bunx tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0"
+  }
+}

@@ -1,0 +1,262 @@
+:root {
+  --color-bg: #f4f7f2;
+  --color-panel: #ffffff;
+  --color-text: #1f2a1f;
+  --color-text-muted: #5a6859;
+  --color-border: #d4e1d0;
+  --color-primary: #1b7f5f;
+  --color-primary-soft: #86c2ae;
+  --color-danger: #ac3f3f;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 20% 10%, #d8f3d5 0%, transparent 35%),
+    radial-gradient(circle at 80% 90%, #f5eac8 0%, transparent 35%),
+    var(--color-bg);
+  color: var(--color-text);
+  font-family: "Noto Sans SC", "Source Han Sans SC", sans-serif;
+}
+
+.prism-button {
+  border: 1px solid transparent;
+  background: var(--color-primary);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.prism-button.secondary {
+  background: #ffffff;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.prism-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.prism-card,
+.prism-panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.prism-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ebf6f2;
+  color: var(--color-primary);
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.focus-layout {
+  min-height: 100vh;
+  padding: 18px;
+  position: relative;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.main-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 3fr 2fr;
+}
+
+.left-pane,
+.right-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: calc(100vh - 130px);
+}
+
+.explore-panel {
+  padding: 12px;
+}
+
+.explore-header {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.explore-textarea {
+  width: 100%;
+  min-height: 88px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  padding: 10px;
+  resize: vertical;
+}
+
+.explore-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.knowledge-canvas {
+  flex: 1;
+  min-height: 450px;
+  overflow: hidden;
+}
+
+.knowledge-empty {
+  padding: 24px;
+  color: var(--color-text-muted);
+}
+
+.notes-panel {
+  flex: 1;
+  padding: 12px;
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr;
+  gap: 10px;
+}
+
+.notes-title {
+  font-weight: 700;
+}
+
+.notes-editor {
+  width: 100%;
+  min-height: 180px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  padding: 10px;
+  resize: vertical;
+}
+
+.notes-preview {
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  padding: 10px;
+  overflow: auto;
+}
+
+.vision-guard {
+  min-width: 360px;
+  padding: 10px;
+}
+
+.vision-top {
+  display: flex;
+  justify-content: space-between;
+}
+
+.vision-title {
+  font-weight: 700;
+}
+
+.vision-subtitle {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.vision-state {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.vision-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.orb-container {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+}
+
+.orb {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(140deg, #1b7f5f, #90c069);
+  color: white;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 12px 30px rgba(27, 127, 95, 0.35);
+}
+
+.orb-panel {
+  width: 330px;
+  margin-top: 10px;
+  margin-left: auto;
+  padding: 12px;
+}
+
+.orb-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+}
+
+.orb-message {
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.orb-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 980px) {
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .topbar-actions {
+    flex-wrap: wrap;
+  }
+
+  .vision-guard {
+    min-width: 0;
+    width: 100%;
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "prism-mvp",
+  "private": true,
+  "packageManager": "bun@1.3.10",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "bun --cwd apps/web dev",
+    "dev:bff": "go -C apps/bff run ./cmd/prism-bff",
+    "dev:desktop": "bun --cwd apps/desktop dev",
+    "build:web": "bun --cwd apps/web build",
+    "build:bff": "go -C apps/bff build ./cmd/prism-bff",
+    "test:web": "bun --cwd apps/web test",
+    "test:bff": "go -C apps/bff test ./...",
+    "test": "bun run test:web && bun run test:bff",
+    "lint:web": "bun --cwd apps/web lint"
+  }
+}
