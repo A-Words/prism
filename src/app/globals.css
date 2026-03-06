@@ -106,13 +106,147 @@
     background: white;
     border: 2px solid #e2e8f0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    max-width: 320px;
+    max-width: 340px;
     transition: all 0.2s ease;
   }
 
   .solution-step-node:hover {
     border-color: var(--color-primary-400);
     box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+  }
+
+  /* Node interaction states */
+  .solution-step-node[data-state="locked"] {
+    opacity: 0.55;
+    filter: grayscale(0.3);
+  }
+
+  .solution-step-node[data-state="hinted"] {
+    border-color: var(--color-trigonometry);
+    box-shadow: 0 2px 12px rgba(245, 158, 11, 0.15);
+  }
+
+  .solution-step-node[data-state="attempted"] {
+    border-color: var(--color-geometry);
+    box-shadow: 0 2px 12px rgba(16, 185, 129, 0.18);
+  }
+
+  /* Guide sidebar */
+  .guide-sidebar {
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(16px);
+    border-left: 1px solid #e2e8f0;
+    transition: width 0.3s ease, opacity 0.3s ease;
+    overflow-y: auto;
+  }
+
+  .guide-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .guide-section:last-child {
+    border-bottom: none;
+  }
+
+  .guide-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-bottom: 10px;
+  }
+
+  /* Interaction bubble */
+  .interaction-bubble {
+    margin-top: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #eef2ff, #f0f9ff);
+    border: 1px solid #c7d2fe;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .interaction-option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-top: 6px;
+  }
+
+  .interaction-option:hover {
+    border-color: var(--color-primary-400);
+    background: var(--color-primary-50);
+  }
+
+  .interaction-option.selected {
+    border-color: var(--color-primary-500);
+    background: var(--color-primary-50);
+    color: var(--color-primary-700);
+    font-weight: 600;
+  }
+
+  /* Dashboard cards */
+  .dashboard-section {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
+    padding: 24px;
+  }
+
+  .task-card {
+    padding: 14px 18px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+
+  .task-card:hover {
+    border-color: var(--color-primary-300);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .weak-point-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid;
+    background: white;
+    font-size: 14px;
+    transition: all 0.15s ease;
+  }
+
+  .weak-point-tag:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Step hint reveal */
+  .hint-reveal {
+    margin-top: 10px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+    border: 1px solid #86efac;
+    font-size: 13px;
+    color: #166534;
+    animation: fadeIn 0.3s ease-out;
   }
 
   .diagnostic-node {

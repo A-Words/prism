@@ -45,6 +45,16 @@ export type SolutionStepType =
   | "verification"  // 验证检查
   | "conclusion";   // 得出结论
 
+/** 解题节点的交互状态 */
+export type SolutionStepState = "locked" | "hinted" | "attempted";
+
+/** 节点内嵌的互动提问 */
+export interface InteractionPoint {
+  question: string;       // "下一步你会先判断什么？"
+  options?: string[];     // 可选：选择题
+  hint: string;           // 尝试后揭示的提示
+}
+
 export interface SolutionStep {
   id: string;
   title: string;
@@ -52,12 +62,29 @@ export interface SolutionStep {
   explanation: string;   // 详细解释
   knowledgePoints: string[]; // 关联的知识点 ID
   type: SolutionStepType;
+  /** 为什么先做这一步 */
+  whyThisStep?: string;
+  /** 如果走错会错在哪 */
+  commonMistake?: string;
+  /** 有没有替代路线 */
+  alternativeApproach?: string;
+  /** 节点内互动点 */
+  interactionPoint?: InteractionPoint;
 }
 
 export interface SolutionEdge {
   source: string;
   target: string;
   label?: string;
+}
+
+/** 解题引导面板数据 */
+export interface ProblemGuide {
+  problemType: string;
+  typeExplanation: string;
+  prerequisites: { id: string; name: string; why: string }[];
+  commonMistakes: { description: string; why: string }[];
+  stepHints: string[];   // 递进式提示
 }
 
 export interface SolutionPath {
@@ -68,6 +95,8 @@ export interface SolutionPath {
   edges: SolutionEdge[];
   summary: string;
   relatedKnowledge: string[];
+  /** 解题引导面板 */
+  guide?: ProblemGuide;
 }
 
 // ---- 学习路径 ----

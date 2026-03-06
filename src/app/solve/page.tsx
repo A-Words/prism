@@ -19,6 +19,16 @@ import {
   Sparkles,
   BookOpen,
   ChevronRight,
+  ChevronLeft,
+  PanelRightOpen,
+  PanelRightClose,
+  AlertTriangle,
+  ArrowRightLeft,
+  GraduationCap,
+  Lightbulb,
+  Eye,
+  EyeOff,
+  Footprints,
 } from "lucide-react";
 import { SolutionNode } from "@/components/graph/solution-node";
 import type { SolutionNodeData } from "@/components/graph/solution-node";
@@ -32,6 +42,8 @@ import {
   CATEGORY_LABELS,
   type SolutionPath,
   type SolutionStepType,
+  type SolutionStepState,
+  type ProblemGuide,
 } from "@/types";
 
 const nodeTypes = { solutionStep: SolutionNode };
@@ -41,11 +53,13 @@ export default function SolvePage() {
   const [loading, setLoading] = useState(false);
   const [solutionPath, setSolutionPath] = useState<SolutionPath | null>(null);
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
+  const [stepStates, setStepStates] = useState<Record<string, SolutionStepState>>({});
 
   const handleSolve = useCallback(async () => {
     if (!problem.trim()) return;
     setLoading(true);
     setExpandedStep(null);
+    setStepStates({});
 
     try {
       const res = await fetch("/api/solve", {
@@ -57,22 +71,61 @@ export default function SolvePage() {
       if (res.ok) {
         const data = await res.json();
         setSolutionPath(data);
+        // Initialize: only first step is "hinted", rest locked
+        if (data.steps?.length > 0) {
+          const initial: Record<string, SolutionStepState> = {};
+          data.steps.forEach((s: { id: string }, i: number) => {
+            initial[s.id] = i === 0 ? "hinted" : "locked";
+          });
+          setStepStates(initial);
+        }
       } else {
-        // Fallback to mock data
         setSolutionPath(mockSolutionPath);
+        initMockStates();
       }
     } catch {
-      // Use mock data when API unavailable
       setSolutionPath(mockSolutionPath);
+      initMockStates();
     } finally {
       setLoading(false);
     }
   }, [problem]);
 
+  const initMockStates = () => {
+    const initial: Record<string, SolutionStepState> = {};
+    mockSolutionPath.steps.forEach((s, i) => {
+      initial[s.id] = i === 0 ? "hinted" : "locked";
+    });
+    setStepStates(initial);
+  };
+
   const handleDemo = useCallback(() => {
     setProblem("解不等式 x² - 3x + 2 < 0");
     setSolutionPath(mockSolutionPath);
+    initMockStates();
   }, []);
+
+  const handleStepStateChange = useCallback(
+    (stepId: string, newState: SolutionStepState) => {
+      setStepStates((prev) => {
+        const updated = { ...prev, [stepId]: newState };
+
+        // When a step is attempted, unlock the next one
+        if (newState === "attempted" && solutionPath) {
+          const idx = solutionPath.steps.findIndex((s) => s.id === stepId);
+          if (idx >= 0 && idx < solutionPath.steps.length - 1) {
+            const nextId = solutionPath.steps[idx + 1].id;
+            if (updated[nextId] === "locked") {
+              updated[nextId] = "hinted";
+            }
+          }
+        }
+
+        return updated;
+      });
+    },
+    [solutionPath]
+  );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -84,7 +137,7 @@ export default function SolvePage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">解题路径图</h1>
           <p className="text-sm text-slate-500">
-            输入数学题目，AI 为你生成可视化解题步骤
+            输入题目，AI 生成思维导图式的解题路径——每一步都告诉你"为什么"
           </p>
         </div>
       </div>
@@ -109,7 +162,10 @@ export default function SolvePage() {
                 支持 LaTeX 语法，Ctrl+Enter 提交
               </span>
               <div className="flex gap-2">
-                <button onClick={handleDemo} className="btn-secondary text-sm py-2 px-4">
+                <button
+                  onClick={handleDemo}
+                  className="btn-secondary text-sm py-2 px-4"
+                >
                   <Sparkles className="w-4 h-4" />
                   查看示例
                 </button>
@@ -131,7 +187,7 @@ export default function SolvePage() {
         </div>
       </div>
 
-      {/* Solution Path visualization */}
+      {/* Solution Path visualization + Guide Sidebar */}
       {solutionPath && (
         <SolutionPathView
           path={solutionPath}
@@ -139,6 +195,8 @@ export default function SolvePage() {
           onToggleStep={(id) =>
             setExpandedStep(expandedStep === id ? null : id)
           }
+          stepStates={stepStates}
+          onStepStateChange={handleStepStateChange}
         />
       )}
     </div>
@@ -149,16 +207,23 @@ function SolutionPathView({
   path,
   expandedStep,
   onToggleStep,
+  stepStates,
+  onStepStateChange,
 }: {
   path: SolutionPath;
   expandedStep: string | null;
   onToggleStep: (id: string) => void;
+  stepStates: Record<string, SolutionStepState>;
+  onStepStateChange: (stepId: string, state: SolutionStepState) => void;
 }) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeHintLevel, setActiveHintLevel] = useState(0);
+
   const { nodes: flowNodes, edges: flowEdges } = useMemo(() => {
     const nodes: Node[] = path.steps.map((step, i) => ({
       id: step.id,
       type: "solutionStep",
-      position: { x: 250, y: i * 200 },
+      position: { x: 250, y: i * 240 },
       data: {
         title: step.title,
         content: step.content,
@@ -167,6 +232,13 @@ function SolutionPathView({
         knowledgePoints: step.knowledgePoints,
         isExpanded: expandedStep === step.id,
         onToggle: () => onToggleStep(step.id),
+        stepState: stepStates[step.id] || "locked",
+        onStateChange: (state: SolutionStepState) =>
+          onStepStateChange(step.id, state),
+        whyThisStep: step.whyThisStep,
+        commonMistake: step.commonMistake,
+        alternativeApproach: step.alternativeApproach,
+        interactionPoint: step.interactionPoint,
       } satisfies SolutionNodeData,
     }));
 
@@ -180,13 +252,23 @@ function SolutionPathView({
         strokeWidth: 2,
       },
       label: e.label,
+      labelStyle: { fontSize: 11, fill: "#94a3b8" },
     }));
 
     return { nodes, edges };
-  }, [path, expandedStep, onToggleStep]);
+  }, [path, expandedStep, onToggleStep, stepStates, onStepStateChange]);
 
   const [nodes, , onNodesChange] = useNodesState(flowNodes);
   const [edges, , onEdgesChange] = useEdgesState(flowEdges);
+
+  // Progress stats
+  const totalSteps = path.steps.length;
+  const attemptedSteps = Object.values(stepStates).filter(
+    (s) => s === "attempted"
+  ).length;
+  const hintedSteps = Object.values(stepStates).filter(
+    (s) => s === "hinted"
+  ).length;
 
   // Get unique step types for legend
   const stepTypes = useMemo(() => {
@@ -201,9 +283,11 @@ function SolutionPathView({
       .filter(Boolean);
   }, [path]);
 
+  const guide = path.guide;
+
   return (
     <div className="space-y-5">
-      {/* Problem summary */}
+      {/* Problem summary + Progress bar */}
       <div className="glass-card p-5">
         <div className="flex items-start gap-4">
           <div className="flex-1">
@@ -215,6 +299,10 @@ function SolutionPathView({
                 难度 {"★".repeat(path.difficulty)}
                 {"☆".repeat(5 - path.difficulty)}
               </span>
+              <span className="badge bg-emerald-100 text-emerald-700">
+                <Footprints className="w-3 h-3" />
+                {attemptedSteps}/{totalSteps} 步已探索
+              </span>
             </div>
             <div className="text-lg font-semibold text-slate-800 mb-2">
               <MathText text={path.problem} />
@@ -224,25 +312,225 @@ function SolutionPathView({
             </div>
           </div>
         </div>
+
+        {/* Mini progress bar */}
+        <div className="mt-4 flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden flex">
+            {path.steps.map((step) => {
+              const state = stepStates[step.id] || "locked";
+              return (
+                <div
+                  key={step.id}
+                  className="h-full transition-all duration-300"
+                  style={{
+                    flex: 1,
+                    backgroundColor:
+                      state === "attempted"
+                        ? "#10b981"
+                        : state === "hinted"
+                          ? "#f59e0b"
+                          : "#e5e7eb",
+                  }}
+                />
+              );
+            })}
+          </div>
+          <span className="text-xs text-slate-400">
+            {attemptedSteps === totalSteps
+              ? "🎉 全部完成"
+              : `${attemptedSteps} / ${totalSteps}`}
+          </span>
+        </div>
       </div>
 
-      {/* Graph */}
-      <div className="glass-card overflow-hidden" style={{ height: "600px" }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          nodeTypes={nodeTypes}
-          fitView
-          fitViewOptions={{ padding: 0.3 }}
-          minZoom={0.3}
-          maxZoom={1.5}
-          proOptions={{ hideAttribution: true }}
+      {/* Graph + Sidebar layout */}
+      <div className="flex gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {/* Graph */}
+        <div
+          className="relative transition-all duration-300"
+          style={{
+            height: "650px",
+            flex: sidebarOpen ? "1 1 0%" : "1 1 100%",
+          }}
         >
-          <Controls />
-          <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#e2e8f0" />
-        </ReactFlow>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            nodeTypes={nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.3 }}
+            minZoom={0.3}
+            maxZoom={1.5}
+            proOptions={{ hideAttribution: true }}
+          >
+            <Controls />
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={24}
+              size={1}
+              color="#e2e8f0"
+            />
+          </ReactFlow>
+
+          {/* Sidebar toggle */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="absolute top-4 right-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 shadow-sm"
+          >
+            {sidebarOpen ? (
+              <>
+                <PanelRightClose className="w-4 h-4" />
+                收起引导
+              </>
+            ) : (
+              <>
+                <PanelRightOpen className="w-4 h-4" />
+                展开引导
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Guide Sidebar */}
+        {sidebarOpen && (
+          <div
+            className="guide-sidebar shrink-0 animate-slide-in"
+            style={{ width: 320 }}
+          >
+            {guide ? (
+              <>
+                {/* 题型识别 */}
+                <div className="guide-section">
+                  <div className="guide-section-title">📋 题型识别</div>
+                  <div className="text-sm font-semibold text-slate-800 mb-1">
+                    {guide.problemType}
+                  </div>
+                  <div className="text-xs text-slate-500 leading-relaxed">
+                    <MathText text={guide.typeExplanation} />
+                  </div>
+                </div>
+
+                {/* 前置知识 */}
+                <div className="guide-section">
+                  <div className="guide-section-title">📚 前置知识</div>
+                  <div className="space-y-2">
+                    {guide.prerequisites.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-start gap-2 text-xs"
+                      >
+                        <GraduationCap className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold text-slate-700">
+                            {p.name}
+                          </span>
+                          <span className="text-slate-500"> — {p.why}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 易错点 */}
+                <div className="guide-section">
+                  <div className="guide-section-title">⚠️ 易错点</div>
+                  <div className="space-y-2">
+                    {guide.commonMistakes.map((m, i) => (
+                      <div
+                        key={i}
+                        className="text-xs bg-amber-50 rounded-lg p-2.5"
+                      >
+                        <div className="font-semibold text-amber-800 mb-0.5">
+                          <MathText text={m.description} />
+                        </div>
+                        <div className="text-amber-600">
+                          {m.why}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 分步提示 */}
+                <div className="guide-section">
+                  <div className="guide-section-title">💡 分步提示</div>
+                  <div className="space-y-1.5">
+                    {guide.stepHints.map((hint, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        {i <= activeHintLevel ? (
+                          <div className="flex items-start gap-2 text-xs animate-fade-in">
+                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 text-[10px] font-bold shrink-0 mt-0.5">
+                              {i + 1}
+                            </span>
+                            <span className="text-slate-600">{hint}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-xs text-slate-300">
+                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-slate-100 text-slate-400 text-[10px] font-bold shrink-0">
+                              {i + 1}
+                            </span>
+                            <span>· · ·</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {activeHintLevel < guide.stepHints.length - 1 && (
+                    <button
+                      onClick={() => setActiveHintLevel((l) => l + 1)}
+                      className="mt-3 text-xs text-indigo-500 hover:text-indigo-700 font-medium flex items-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      显示下一步提示
+                    </button>
+                  )}
+                  {activeHintLevel >= guide.stepHints.length - 1 &&
+                    guide.stepHints.length > 1 && (
+                      <button
+                        onClick={() => setActiveHintLevel(0)}
+                        className="mt-3 text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
+                      >
+                        <EyeOff className="w-3.5 h-3.5" />
+                        收起提示
+                      </button>
+                    )}
+                </div>
+
+                {/* 我来试一步 */}
+                <div className="guide-section">
+                  <div className="guide-section-title">✏️ 我来试一步</div>
+                  <p className="text-xs text-slate-500 mb-2">
+                    点击路径图中的节点展开详情，尝试回答互动问题。每完成一步，下一步会自动解锁。
+                  </p>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="flex items-center gap-1 text-slate-400">
+                      <span className="w-2 h-2 rounded-full bg-slate-300" />
+                      未展开
+                    </span>
+                    <span className="flex items-center gap-1 text-amber-500">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      已提示
+                    </span>
+                    <span className="flex items-center gap-1 text-emerald-600">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      已尝试
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Fallback when no guide data */
+              <div className="guide-section">
+                <div className="guide-section-title">📋 解题信息</div>
+                <div className="text-xs text-slate-500">
+                  点击路径图中的节点查看详细解析。
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Legend & Related Knowledge */}
