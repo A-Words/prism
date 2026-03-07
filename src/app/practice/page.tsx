@@ -24,6 +24,13 @@ import {
   Sparkles,
   ArrowRight,
   Loader2,
+  AlertTriangle,
+  BookOpen,
+  Zap,
+  Target,
+  Play,
+  ArrowLeftCircle,
+  RefreshCw,
 } from "lucide-react";
 import { DiagnosticNode } from "@/components/graph/diagnostic-node";
 import type { DiagnosticNodeData } from "@/components/graph/diagnostic-node";
@@ -31,10 +38,12 @@ import { MathText } from "@/components/ui/math-renderer";
 import { mockQuestions, mockDiagnosis } from "@/lib/mock-data";
 import { getKnowledgeNode, getAllPrerequisites } from "@/lib/knowledge-graph";
 import { useAppStore } from "@/lib/store";
-import type { PracticeQuestion, DiagnosticResult } from "@/types";
+import type { PracticeQuestion, DiagnosticResult, MicroExercise } from "@/types";
 import {
   CATEGORY_COLORS,
   CATEGORY_LABELS,
+  ERROR_CATEGORY_COLORS,
+  ERROR_CATEGORY_LABELS,
 } from "@/types";
 
 const nodeTypes = { diagnosticNode: DiagnosticNode };
@@ -264,13 +273,42 @@ export default function PracticePage() {
                     重新作答
                   </button>
                   <div className="flex-1" />
-                  <button
-                    onClick={handleNext}
-                    className="btn-primary text-sm py-2 px-4"
-                  >
-                    下一题
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  {diagnosis ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          // 滚动到诊断区域的第四段
+                          document.getElementById("diagnosis-section-4")?.scrollIntoView({ behavior: "smooth" });
+                        }}
+                        className="btn-primary text-sm py-2 px-4"
+                      >
+                        <Play className="w-4 h-4" />
+                        开始补救练习
+                      </button>
+                      <button
+                        onClick={() => window.location.href = "/learn"}
+                        className="btn-secondary text-sm py-2 px-4"
+                      >
+                        <ArrowLeftCircle className="w-4 h-4" />
+                        回到前置知识
+                      </button>
+                      <button
+                        onClick={handleNext}
+                        className="btn-secondary text-sm py-2 px-4"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        再做一题验证
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleNext}
+                      className="btn-primary text-sm py-2 px-4"
+                    >
+                      下一题
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -384,67 +422,71 @@ export default function PracticePage() {
   );
 }
 
+// ============================================================
+// 四段式诊断视图
+// ============================================================
+
 function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
   const getMastery = useAppStore((s) => s.getMastery);
 
-  // Build diagnostic graph
+  // 微练习答题状态
+  const [microAnswers, setMicroAnswers] = useState<Record<string, string | null>>({});
+  const [microSubmitted, setMicroSubmitted] = useState<Record<string, boolean>>({});
+  const [retestAnswer, setRetestAnswer] = useState<string | null>(null);
+  const [retestSubmitted, setRetestSubmitted] = useState(false);
+
+  const handleMicroSelect = (exerciseId: string, answer: string) => {
+    if (microSubmitted[exerciseId]) return;
+    setMicroAnswers((prev) => ({ ...prev, [exerciseId]: answer }));
+  };
+
+  const handleMicroSubmit = (exerciseId: string) => {
+    setMicroSubmitted((prev) => ({ ...prev, [exerciseId]: true }));
+  };
+
+  const handleRetestSelect = (answer: string) => {
+    if (retestSubmitted) return;
+    setRetestAnswer(answer);
+  };
+
+  const handleRetestSubmit = () => {
+    setRetestSubmitted(true);
+  };
+
+  // 构建回溯路径图
   const { nodes: flowNodes, edges: flowEdges } = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
 
-    // Error node at top
-    nodes.push({
-      id: "error",
-      type: "diagnosticNode",
-      position: { x: 200, y: 0 },
-      data: {
-        label: "答案错误",
-        status: "error",
-        detail: diagnosis.errorAnalysis,
-      } satisfies DiagnosticNodeData,
-    });
-
-    // Missing knowledge nodes
-    diagnosis.missingKnowledge.forEach((id, i) => {
-      const kn = getKnowledgeNode(id);
-      if (!kn) return;
-
+    // 前置知识节点
+    diagnosis.prerequisitesToFix.forEach((prereq, i) => {
+      const kn = getKnowledgeNode(prereq.id);
       nodes.push({
-        id: `missing-${id}`,
+        id: `prereq-${prereq.id}`,
         type: "diagnosticNode",
-        position: { x: i * 250, y: 150 },
+        position: { x: i * 260, y: 0 },
         data: {
-          label: kn.name,
+          label: prereq.name,
           status: "missing",
-          detail: `${CATEGORY_LABELS[kn.category]} · ${kn.description}`,
+          detail: prereq.reason,
         } satisfies DiagnosticNodeData,
       });
-
-      edges.push({
-        id: `e-error-${id}`,
-        source: "error",
-        target: `missing-${id}`,
-        animated: true,
-        style: { stroke: "#f59e0b", strokeWidth: 2 },
-      });
     });
 
-    // Backtrack path nodes
-    const backtrackNodes = diagnosis.backtrackPath.filter(
-      (id) => !diagnosis.missingKnowledge.includes(id)
-    );
+    // 回溯路径中其他节点
+    const prereqIds = new Set(diagnosis.prerequisitesToFix.map((p) => p.id));
+    const otherNodes = diagnosis.backtrackPath.filter((id) => !prereqIds.has(id));
 
-    backtrackNodes.forEach((id, i) => {
+    otherNodes.forEach((id, i) => {
       const kn = getKnowledgeNode(id);
       if (!kn) return;
-
       const mastery = getMastery(id);
       const status = mastery === "high" || mastery === "full" ? "correct" : "review";
 
       nodes.push({
         id: `bt-${id}`,
         type: "diagnosticNode",
-        position: { x: i * 220 + 50, y: 320 },
+        position: { x: i * 220 + 50, y: 140 },
         data: {
           label: kn.name,
           status,
@@ -452,17 +494,16 @@ function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
         } satisfies DiagnosticNodeData,
       });
 
-      // Connect to parent missing knowledge
-      const parentMissing = diagnosis.missingKnowledge.find((mid) => {
-        const mNode = getKnowledgeNode(mid);
-        return mNode?.prerequisites.includes(id);
+      // 连接到前置知识节点
+      const parentPrereq = diagnosis.prerequisitesToFix.find((p) => {
+        const pNode = getKnowledgeNode(p.id);
+        return pNode?.prerequisites.includes(id);
       });
-
-      if (parentMissing) {
+      if (parentPrereq) {
         edges.push({
-          id: `e-bt-${id}-${parentMissing}`,
+          id: `e-${id}-${parentPrereq.id}`,
           source: `bt-${id}`,
-          target: `missing-${parentMissing}`,
+          target: `prereq-${parentPrereq.id}`,
           style: { stroke: "#3b82f6", strokeWidth: 2 },
         });
       }
@@ -474,80 +515,276 @@ function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
   const [nodes, , onNodesChange] = useNodesState(flowNodes);
   const [edges, , onEdgesChange] = useEdgesState(flowEdges);
 
+  const categoryColor = ERROR_CATEGORY_COLORS[diagnosis.errorCategory] || "#64748b";
+
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Error Analysis */}
-      <div className="glass-card p-5 border-2 border-red-200 bg-red-50/30">
+    <div className="space-y-4 animate-fade-in">
+      {/* ================================================ */}
+      {/* 第一段：你错在哪里 */}
+      {/* ================================================ */}
+      <div className="diagnosis-section diagnosis-section-1">
         <div className="flex items-center gap-2 mb-3">
-          <XCircle className="w-5 h-5 text-red-500" />
-          <h3 className="text-lg font-bold text-red-700">诊断分析</h3>
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-500 text-white text-xs font-bold">1</div>
+          <h3 className="text-base font-bold text-red-700">你错在哪里</h3>
         </div>
-        <div className="text-sm text-slate-700 leading-relaxed mb-4">
-          <MathText text={diagnosis.errorAnalysis || ""} />
+        <div className="text-sm text-slate-800 leading-relaxed">
+          <MathText text={diagnosis.errorPinpoint} />
         </div>
-        <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-          <MathText text={diagnosis.explanation} />
+        {diagnosis.errorStep && (
+          <div className="mt-3 pl-3 border-l-2 border-red-200 text-sm text-slate-600">
+            <span className="font-medium text-red-600">关键步骤：</span>
+            <MathText text={diagnosis.errorStep} />
+          </div>
+        )}
+      </div>
+
+      {/* ================================================ */}
+      {/* 第二段：为什么会错 */}
+      {/* ================================================ */}
+      <div className="diagnosis-section diagnosis-section-2">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white text-xs font-bold">2</div>
+          <h3 className="text-base font-bold text-amber-700">为什么会错</h3>
+          <span
+            className="error-category-badge"
+            style={{ backgroundColor: `${categoryColor}15`, color: categoryColor, borderColor: `${categoryColor}30` }}
+          >
+            {diagnosis.errorCategoryLabel}
+          </span>
+        </div>
+        <div className="text-sm text-slate-700 leading-relaxed">
+          <MathText text={diagnosis.whyWrong} />
         </div>
       </div>
 
-      {/* Backtrack Graph */}
-      <div className="glass-card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <RotateCcw className="w-5 h-5 text-blue-500" />
-          <h3 className="text-sm font-bold text-slate-700">知识回溯路径图</h3>
+      {/* ================================================ */}
+      {/* 第三段：要补哪一层 */}
+      {/* ================================================ */}
+      <div className="diagnosis-section diagnosis-section-3">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500 text-white text-xs font-bold">3</div>
+          <h3 className="text-base font-bold text-blue-700">要补哪一层</h3>
           <span className="text-xs text-slate-400 ml-auto">
-            点击节点查看详细信息
+            {diagnosis.prerequisitesToFix.length} 个前置知识点
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-slate-200" style={{ height: "400px" }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            nodeTypes={nodeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.4 }}
-            minZoom={0.4}
-            maxZoom={1.5}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Controls />
-            <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#e2e8f0" />
-          </ReactFlow>
-        </div>
-      </div>
-
-      {/* Suggested Review */}
-      <div className="glass-card p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <Lightbulb className="w-5 h-5 text-amber-500" />
-          <h3 className="text-sm font-bold text-slate-700">建议复习路径</h3>
-        </div>
-        <div className="flex flex-wrap items-center gap-1">
-          {diagnosis.suggestedReview.map((id, i) => {
-            const kn = getKnowledgeNode(id);
-            if (!kn) return null;
+        <div className="grid gap-3 mb-4">
+          {diagnosis.prerequisitesToFix.map((prereq) => {
+            const kn = getKnowledgeNode(prereq.id);
             return (
-              <span key={id} className="flex items-center gap-1">
-                <span
-                  className="badge text-xs"
-                  style={{
-                    backgroundColor: `${CATEGORY_COLORS[kn.category]}15`,
-                    color: CATEGORY_COLORS[kn.category],
-                  }}
-                >
-                  {kn.name}
-                </span>
-                {i < diagnosis.suggestedReview.length - 1 && (
-                  <ChevronRight className="w-3 h-3 text-slate-300" />
-                )}
-              </span>
+              <div key={prereq.id} className="prereq-card">
+                <div className="flex items-center gap-2 mb-1">
+                  <Target className="w-4 h-4 text-blue-500 shrink-0" />
+                  <span className="text-sm font-bold text-slate-800">{prereq.name}</span>
+                  {kn && (
+                    <span
+                      className="badge text-[10px]"
+                      style={{
+                        backgroundColor: `${CATEGORY_COLORS[kn.category]}15`,
+                        color: CATEGORY_COLORS[kn.category],
+                      }}
+                    >
+                      {CATEGORY_LABELS[kn.category]}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 ml-6">{prereq.reason}</p>
+              </div>
             );
           })}
         </div>
+
+        {/* 迷你回溯图 */}
+        {flowNodes.length > 0 && (
+          <div className="overflow-hidden rounded-xl border border-slate-200/60" style={{ height: "220px" }}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              nodeTypes={nodeTypes}
+              fitView
+              fitViewOptions={{ padding: 0.5 }}
+              minZoom={0.4}
+              maxZoom={1.2}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Controls showInteractive={false} />
+              <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
+            </ReactFlow>
+          </div>
+        )}
       </div>
+
+      {/* ================================================ */}
+      {/* 第四段：现在就补 */}
+      {/* ================================================ */}
+      <div className="diagnosis-section diagnosis-section-4" id="diagnosis-section-4">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-500 text-white text-xs font-bold">4</div>
+          <h3 className="text-base font-bold text-green-700">现在就补</h3>
+          <Zap className="w-4 h-4 text-green-500" />
+        </div>
+
+        {/* 超短讲解 */}
+        <div className="mini-lesson-card mb-5">
+          <div className="flex items-center gap-2 mb-2">
+            <BookOpen className="w-4 h-4 text-green-600" />
+            <span className="text-sm font-bold text-green-800">核心精讲</span>
+          </div>
+          <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+            <MathText text={diagnosis.miniLesson} />
+          </div>
+        </div>
+
+        {/* 微练习 */}
+        <div className="space-y-4 mb-5">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-indigo-500" />
+            <span className="text-sm font-bold text-slate-700">针对微练习</span>
+            <span className="text-xs text-slate-400">做完才能回测</span>
+          </div>
+
+          {diagnosis.microExercises.map((ex, idx) => (
+            <MicroExerciseCard
+              key={ex.id}
+              exercise={ex}
+              index={idx + 1}
+              selectedAnswer={microAnswers[ex.id] || null}
+              submitted={!!microSubmitted[ex.id]}
+              onSelect={(ans) => handleMicroSelect(ex.id, ans)}
+              onSubmit={() => handleMicroSubmit(ex.id)}
+            />
+          ))}
+        </div>
+
+        {/* 回测题 */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="w-4 h-4 text-orange-500" />
+            <span className="text-sm font-bold text-slate-700">回测验证</span>
+            <span className="text-xs text-slate-400">与原题结构相同，数值不同</span>
+          </div>
+
+          <MicroExerciseCard
+            exercise={diagnosis.retestQuestion}
+            index={0}
+            label="回测"
+            selectedAnswer={retestAnswer}
+            submitted={retestSubmitted}
+            onSelect={handleRetestSelect}
+            onSubmit={handleRetestSubmit}
+          />
+
+          {retestSubmitted && retestAnswer === diagnosis.retestQuestion.correctAnswer && (
+            <div className="mt-3 flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <span className="text-sm font-bold text-green-700">回测通过！你已经掌握了这个知识点。</span>
+            </div>
+          )}
+          {retestSubmitted && retestAnswer !== diagnosis.retestQuestion.correctAnswer && (
+            <div className="mt-3 flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <span className="text-sm text-amber-700">还需要再巩固一下，建议回到前置知识重新学习。</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// 微练习 / 回测题 卡片组件
+// ============================================================
+
+function MicroExerciseCard({
+  exercise,
+  index,
+  label,
+  selectedAnswer,
+  submitted,
+  onSelect,
+  onSubmit,
+}: {
+  exercise: MicroExercise;
+  index: number;
+  label?: string;
+  selectedAnswer: string | null;
+  submitted: boolean;
+  onSelect: (answer: string) => void;
+  onSubmit: () => void;
+}) {
+  const isCorrect = submitted && selectedAnswer === exercise.correctAnswer;
+  const isWrong = submitted && selectedAnswer !== exercise.correctAnswer;
+
+  return (
+    <div className={`micro-exercise-card ${isCorrect ? "micro-correct" : isWrong ? "micro-wrong" : ""}`}>
+      <div className="flex items-start gap-2 mb-3">
+        <span className={`badge text-xs shrink-0 ${isCorrect ? "bg-green-100 text-green-700" : isWrong ? "bg-red-100 text-red-700" : "bg-indigo-100 text-indigo-700"}`}>
+          {label || `微练 ${index}`}
+        </span>
+        <div className="text-sm text-slate-700 flex-1">
+          <MathText text={exercise.problem} />
+        </div>
+      </div>
+
+      {exercise.options && (
+        <div className="space-y-2 mb-3">
+          {exercise.options.map((opt, i) => {
+            const letter = String.fromCharCode(65 + i);
+            const isSelected = selectedAnswer === opt;
+            const optCorrect = submitted && opt === exercise.correctAnswer;
+            const optWrong = submitted && isSelected && opt !== exercise.correctAnswer;
+
+            return (
+              <button
+                key={i}
+                onClick={() => onSelect(opt)}
+                disabled={submitted}
+                className={`micro-exercise-option ${
+                  optCorrect
+                    ? "border-green-400 bg-green-50"
+                    : optWrong
+                    ? "border-red-400 bg-red-50"
+                    : isSelected
+                    ? "border-indigo-400 bg-indigo-50"
+                    : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <span className={`micro-option-letter ${
+                  optCorrect
+                    ? "bg-green-500 text-white"
+                    : optWrong
+                    ? "bg-red-500 text-white"
+                    : isSelected
+                    ? "bg-indigo-500 text-white"
+                    : "bg-slate-100 text-slate-500"
+                }`}>
+                  {optCorrect ? "\u2713" : optWrong ? "\u2717" : letter}
+                </span>
+                <span className="text-sm text-slate-700 flex-1">
+                  <MathText text={opt} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!submitted && selectedAnswer && (
+        <button onClick={onSubmit} className="btn-primary text-xs py-1.5 px-3">
+          <CheckCircle className="w-3.5 h-3.5" />
+          确认
+        </button>
+      )}
+
+      {submitted && (
+        <div className="mt-2 text-xs text-slate-500">
+          <span className="font-medium">设计意图：</span>{exercise.purpose}
+        </div>
+      )}
     </div>
   );
 }

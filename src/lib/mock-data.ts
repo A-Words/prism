@@ -281,17 +281,94 @@ export const mockQuestions: PracticeQuestion[] = [
 ];
 
 /**
- * 示例诊断结果
+ * 示例诊断结果（四段式）
  */
 export const mockDiagnosis: DiagnosticResult = {
   questionId: "q3",
   isCorrect: false,
   studentAnswer: "$-\\frac{7}{25}$",
+
+  // ---- 第一段：你错在哪里 ----
+  errorPinpoint:
+    "你选对了公式，但在求 $\\cos\\alpha$ 时把符号搞反了——第二象限的余弦应该是负值，你可能代入了正值。",
+  errorStep:
+    "在使用 $\\cos 2\\alpha = 2\\cos^2\\alpha - 1$ 时，先求 $\\cos\\alpha$，此时应注意 $\\alpha$ 在第二象限，$\\cos\\alpha < 0$。",
+
+  // ---- 第二段：为什么会错 ----
+  errorCategory: "condition",
+  errorCategoryLabel: "条件识别错误",
+  whyWrong:
+    "题目给了 $\\alpha \\in (\\frac{\\pi}{2}, \\pi)$，这决定了 $\\cos\\alpha$ 的符号。你在计算中忽略了象限对三角函数符号的约束——这是三角函数题中最常见的失分点。",
+
+  // ---- 第三段：要补哪一层 ----
+  prerequisitesToFix: [
+    {
+      id: "trig-identity",
+      name: "同角三角函数关系",
+      reason:
+        "需要熟练掌握 $\\sin^2\\alpha + \\cos^2\\alpha = 1$ 以及各象限的符号规则",
+    },
+    {
+      id: "trig-transform",
+      name: "三角恒等变换",
+      reason:
+        "二倍角公式有三种形式，要学会根据已知条件选最省力的那一个",
+    },
+  ],
+  backtrackPath: ["trig-definition", "trig-identity", "trig-transform"],
+
+  // ---- 第四段：现在就补 ----
+  miniLesson:
+    "**核心要点**：二倍角公式 $\\cos 2\\alpha$ 有三种等价形式：\n\n1. $\\cos 2\\alpha = \\cos^2\\alpha - \\sin^2\\alpha$\n2. $\\cos 2\\alpha = 2\\cos^2\\alpha - 1$\n3. $\\cos 2\\alpha = 1 - 2\\sin^2\\alpha$\n\n**选择技巧**：已知 $\\sin\\alpha$ 就用第 3 个，已知 $\\cos\\alpha$ 就用第 2 个——**直接代入，不需要先求另一个函数值**。这样既快又不会被象限符号绊倒。",
+
+  microExercises: [
+    {
+      id: "micro-1",
+      problem:
+        "若 $\\cos\\alpha = -\\frac{4}{5}$，$\\alpha \\in (\\pi, \\frac{3\\pi}{2})$，则 $\\cos 2\\alpha$ = ?",
+      options: [
+        "$\\frac{7}{25}$",
+        "$-\\frac{7}{25}$",
+        "$\\frac{24}{25}$",
+        "$-\\frac{24}{25}$",
+      ],
+      correctAnswer: "$\\frac{7}{25}$",
+      purpose: "练习直接用 $\\cos 2\\alpha = 2\\cos^2\\alpha - 1$，无需求 $\\sin\\alpha$",
+    },
+    {
+      id: "micro-2",
+      problem:
+        "若 $\\sin\\alpha = \\frac{5}{13}$，$\\alpha \\in (0, \\frac{\\pi}{2})$，则 $\\sin 2\\alpha$ = ?",
+      options: [
+        "$\\frac{120}{169}$",
+        "$\\frac{60}{169}$",
+        "$\\frac{119}{169}$",
+        "$-\\frac{120}{169}$",
+      ],
+      correctAnswer: "$\\frac{120}{169}$",
+      purpose: "综合运用：需要先求 $\\cos\\alpha$（注意象限），再用 $\\sin 2\\alpha = 2\\sin\\alpha\\cos\\alpha$",
+    },
+  ],
+
+  retestQuestion: {
+    id: "retest-1",
+    problem:
+      "若 $\\sin\\alpha = \\frac{4}{5}$，$\\alpha \\in (\\frac{\\pi}{2}, \\pi)$，则 $\\cos 2\\alpha$ 的值为",
+    options: [
+      "$\\frac{7}{25}$",
+      "$-\\frac{7}{25}$",
+      "$\\frac{24}{25}$",
+      "$-\\frac{24}{25}$",
+    ],
+    correctAnswer: "$-\\frac{7}{25}$",
+    purpose: "回测：与原题结构相同但数值不同，检验是否真正掌握",
+  },
+
+  // ---- 兼容旧字段 ----
   errorAnalysis:
-    "你选择了 $-\\frac{7}{25}$，答案的绝对值正确，但符号有误。问题出在没有正确使用二倍角公式。你可能使用了 $\\cos 2\\alpha = 2\\cos^2\\alpha - 1$ 但错误地计算了 $\\cos\\alpha$ 的值或符号。",
+    "你选择了 $-\\frac{7}{25}$，答案的绝对值正确，但符号有误。",
   missingKnowledge: ["trig-transform", "trig-identity"],
   suggestedReview: ["trig-identity", "trig-transform"],
-  backtrackPath: ["trig-definition", "trig-identity", "trig-transform"],
   explanation:
     "**正确解法**：\n\n1. 已知 $\\sin\\alpha = \\frac{3}{5}$，$\\alpha \\in (\\frac{\\pi}{2}, \\pi)$\n2. 使用二倍角公式 $\\cos 2\\alpha = 1 - 2\\sin^2\\alpha$\n3. 代入：$\\cos 2\\alpha = 1 - 2 \\times \\frac{9}{25} = 1 - \\frac{18}{25} = \\frac{7}{25}$\n\n**关键点**：这里直接使用 $\\cos 2\\alpha = 1 - 2\\sin^2\\alpha$ 最为简便，因为已知条件直接给出了 $\\sin\\alpha$ 的值，无需额外求 $\\cos\\alpha$。",
 };

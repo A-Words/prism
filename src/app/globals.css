@@ -546,3 +546,128 @@
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08) !important;
   border: 1px solid #e2e8f0 !important;
 }
+
+/* ============================================================
+   四段式诊断 — Diagnosis Sections
+   ============================================================ */
+
+.diagnosis-section {
+  position: relative;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  border: 1.5px solid transparent;
+  background: white;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s;
+}
+
+.diagnosis-section:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* 第一段：你错在哪里 — 红 */
+.diagnosis-section-1 {
+  border-color: #fca5a540;
+  background: linear-gradient(135deg, #fef2f2 0%, #fff 60%);
+}
+
+/* 第二段：为什么会错 — 琥珀 */
+.diagnosis-section-2 {
+  border-color: #fcd34d40;
+  background: linear-gradient(135deg, #fffbeb 0%, #fff 60%);
+}
+
+/* 第三段：要补哪一层 — 蓝 */
+.diagnosis-section-3 {
+  border-color: #93c5fd40;
+  background: linear-gradient(135deg, #eff6ff 0%, #fff 60%);
+}
+
+/* 第四段：现在就补 — 绿 */
+.diagnosis-section-4 {
+  border-color: #86efac40;
+  background: linear-gradient(135deg, #f0fdf4 0%, #fff 60%);
+}
+
+/* 错误分类徽章 */
+.error-category-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid;
+  line-height: 1.5;
+}
+
+/* 前置知识卡 */
+.prereq-card {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(59, 130, 246, 0.04);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  transition: background 0.15s;
+}
+
+.prereq-card:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+/* 核心精讲卡 */
+.mini-lesson-card {
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  background: rgba(34, 197, 94, 0.04);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+}
+
+/* 微练习卡 */
+.micro-exercise-card {
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  background: rgba(99, 102, 241, 0.03);
+  border: 1.5px solid rgba(99, 102, 241, 0.12);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.micro-exercise-card.micro-correct {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.04);
+}
+
+.micro-exercise-card.micro-wrong {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+/* 微练习选项 */
+.micro-exercise-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.625rem;
+  border: 1.5px solid;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.micro-exercise-option:disabled {
+  cursor: default;
+}
+
+.micro-option-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}

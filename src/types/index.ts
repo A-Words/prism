@@ -172,16 +172,87 @@ export interface PracticeQuestion {
   hints: string[];
 }
 
+/** 错误分类 */
+export type ErrorCategory =
+  | "concept"       // 概念没掌握
+  | "formula"       // 公式选错/记错
+  | "condition"     // 条件识别错误
+  | "computation"   // 计算稳定性不足
+  | "logic"         // 逻辑推理错误
+  | "careless";     // 粗心大意
+
+/** 补救微练习 */
+export interface MicroExercise {
+  id: string;
+  problem: string;          // LaTeX
+  options?: string[];
+  correctAnswer: string;
+  /** 为什么选这道题来练 */
+  purpose: string;
+}
+
+/** 四段式诊断结果 */
 export interface DiagnosticResult {
   questionId: string;
   isCorrect: boolean;
   studentAnswer: string;
+
+  // ---- 第一段：你错在哪里 ----
+  /** 一句话定位错误（不是"答案错了"，而是具体的错误动作） */
+  errorPinpoint: string;
+  /** 错在哪一步 */
+  errorStep?: string;
+
+  // ---- 第二段：为什么会错 ----
+  /** 错误分类 */
+  errorCategory: ErrorCategory;
+  /** 错误分类的中文标签 */
+  errorCategoryLabel: string;
+  /** 为什么会犯这个错误（1-2 句话） */
+  whyWrong: string;
+
+  // ---- 第三段：要补哪一层 ----
+  /** 需要补的前置知识点（1-2 个，不贪多） */
+  prerequisitesToFix: {
+    id: string;
+    name: string;
+    reason: string;
+  }[];
+  /** 回溯的知识点路径 */
+  backtrackPath: string[];
+
+  // ---- 第四段：现在就补 ----
+  /** 超短讲解（核心概念的 2-3 句话精讲） */
+  miniLesson: string;
+  /** 2 道微练习 */
+  microExercises: MicroExercise[];
+  /** 1 道回测题 */
+  retestQuestion: MicroExercise;
+
+  // ---- 保留旧字段兼容 ----
   errorAnalysis?: string;
   missingKnowledge: string[];
   suggestedReview: string[];
-  backtrackPath: string[];   // 回溯的知识点路径
   explanation: string;
 }
+
+export const ERROR_CATEGORY_LABELS: Record<ErrorCategory, string> = {
+  concept: "概念未掌握",
+  formula: "公式选错/记错",
+  condition: "条件识别错误",
+  computation: "计算不稳定",
+  logic: "逻辑推理错误",
+  careless: "粗心大意",
+};
+
+export const ERROR_CATEGORY_COLORS: Record<ErrorCategory, string> = {
+  concept: "#ef4444",
+  formula: "#f59e0b",
+  condition: "#8b5cf6",
+  computation: "#3b82f6",
+  logic: "#06b6d4",
+  careless: "#64748b",
+};
 
 export interface StudentProgress {
   knowledge: Record<string, StudentKnowledge>;
