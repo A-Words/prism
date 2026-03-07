@@ -99,8 +99,51 @@ export interface SolutionPath {
   guide?: ProblemGuide;
 }
 
-// ---- 学习路径 ----
+// ---- 学习规划 ----
 
+/** AI 学习规划器输出的单个节点 */
+export interface LearningPlanNode {
+  knowledgeId: string;
+  phase: number;
+  phaseLabel: string;
+  estimatedMinutes: number;
+  objectives: string[];
+  /** 卡住时退回到哪个节点 */
+  backtrackTo?: string;
+  /** 为什么把这个节点加入计划 */
+  reason: string;
+}
+
+/** 学习规划的阶段描述 */
+export interface LearningPhase {
+  phase: number;
+  label: string;       // "基础准备" / "核心学习" / "目标掌握"
+  description: string;
+}
+
+/** AI 学习规划器的完整输出 */
+export interface LearningPlan {
+  /** AI 解读后的学习目标 */
+  goal: string;
+  /** AI 对用户意图的理解 */
+  interpretation: string;
+  /** 分阶段信息 */
+  phases: LearningPhase[];
+  /** 学习节点（含阶段、退路） */
+  nodes: LearningPlanNode[];
+  /** 节点间的关系 */
+  edges: {
+    source: string;
+    target: string;
+    type: "progress" | "backtrack";
+    label?: string;
+  }[];
+  totalEstimatedMinutes: number;
+  /** 个性化建议 */
+  advice: string;
+}
+
+// 保留旧类型作兼容
 export interface LearningPathNode {
   knowledgeId: string;
   order: number;
