@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { KnowledgeGraphNode } from "@/components/graph/knowledge-node";
 import type { KnowledgeNodeData } from "@/components/graph/knowledge-node";
+import { MathText } from "@/components/ui/math-renderer";
 import { getKnowledgeNode } from "@/lib/knowledge-graph";
 import { useAppStore } from "@/lib/store";
 import type {
@@ -535,11 +536,15 @@ function PlanView({
           <div className="flex items-start gap-3">
             <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
             <div className="space-y-2">
-              <h3 className="font-bold text-slate-900">{plan.goal}</h3>
+              <h3 className="font-bold text-slate-900">
+                <MathText text={plan.goal} />
+              </h3>
               <p className="text-sm leading-relaxed text-slate-600">
-                {plan.interpretation}
+                <MathText text={plan.interpretation} />
               </p>
-              <p className="text-xs text-emerald-700">{plan.whyStartHere}</p>
+              <p className="text-xs text-emerald-700">
+                <MathText text={plan.whyStartHere || ""} />
+              </p>
             </div>
           </div>
         </div>
@@ -637,10 +642,12 @@ function PlanView({
                       {node.estimatedMinutes}m
                     </span>
                   </div>
-                  <p className="text-sm text-slate-600">{node.learnWhat || node.reason}</p>
+                  <p className="text-sm text-slate-600">
+                    <MathText text={node.learnWhat || node.reason} />
+                  </p>
                   {node.commonMistakes?.[0] && (
                     <p className="mt-2 text-xs text-amber-600">
-                      易错点：{node.commonMistakes[0]}
+                      易错点：<MathText text={node.commonMistakes[0]} />
                     </p>
                   )}
                 </button>
@@ -723,7 +730,7 @@ function MetricCard({
   return (
     <div className="glass-card p-4 text-center">
       <div className={`font-bold text-slate-900 ${compact ? "text-sm" : "text-2xl"}`}>
-        {value}
+        <MathText text={value} />
       </div>
       <div className="mt-1 text-xs text-slate-500">{label}</div>
     </div>
@@ -748,7 +755,11 @@ function InfoCard({
         {title}
       </div>
       <div className="text-sm font-semibold text-slate-900">{content}</div>
-      {caption && <div className="mt-1 text-xs text-slate-500">{caption}</div>}
+      {caption && (
+        <div className="mt-1 text-xs text-slate-500">
+          <MathText text={caption} />
+        </div>
+      )}
     </div>
   );
 }
@@ -759,7 +770,9 @@ function SectionBlock({ title, content }: { title: string; content: string }) {
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
         {title}
       </div>
-      <div className="mt-1 text-sm text-slate-700">{content}</div>
+      <div className="mt-1 text-sm text-slate-700">
+        <MathText text={content} />
+      </div>
     </div>
   );
 }
@@ -774,7 +787,9 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
         {items.map((item) => (
           <div key={item} className="flex items-start gap-2 text-sm text-slate-700">
             <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
-            <span>{item}</span>
+            <span>
+              <MathText text={item} />
+            </span>
           </div>
         ))}
       </div>

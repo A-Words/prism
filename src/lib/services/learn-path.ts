@@ -5,6 +5,7 @@ import type {
   MockLearningScenario,
 } from "@/types";
 import { buildKnowledgeContext } from "@/lib/ai/context";
+import { normalizeLearningPlanLatex } from "@/lib/ai/latex";
 import { getAIProvider } from "@/lib/ai/provider";
 import { learningPlanCopySchema, learningPlanSchema } from "@/lib/ai/schemas";
 import {
@@ -473,6 +474,7 @@ async function tryEnhanceLearningPlan(
         "你是高中数学学习规划助手。",
         "你只能润色和补全学习路径文案，不能修改知识点 ID、节点顺序、phase、edge、estimatedMinutes。",
         "输出必须是中文，简洁、可执行、学生可理解。",
+        "涉及公式时优先使用 $...$ 或 $$...$$；如果偶尔输出裸 LaTeX 命令，系统会兼容处理。",
       ].join("\n"),
       prompt: [
         `学习目标：${input.query?.trim() || resolution.target.name}`,
@@ -507,11 +509,16 @@ async function tryEnhanceLearningPlan(
       ].join("\n"),
       schema: learningPlanCopySchema,
       temperature: 0.4,
+      timeoutMs: 45_000,
+      allowLatex: true,
+      repairJson: true,
     });
 
   return {
     plan: learningPlanSchema.parse(
-      mergeLearningCopy(basePlan, object as LearningCopy)
+      normalizeLearningPlanLatex(
+        mergeLearningCopy(basePlan, object as LearningCopy)
+      )
     ),
     providerName,
     model,
@@ -520,7 +527,7 @@ async function tryEnhanceLearningPlan(
 
 export async function generateLearningPlan(input: GenerateLearningPlanInput) {
   const resolution = resolveLearningTarget(input);
-  const rulePlan = buildRulePlan(input, resolution);
+  const rulePlan = normalizeLearningPlanLatex(buildRulePlan(input, resolution));
 
   try {
     const aiResult = await tryEnhanceLearningPlan(rulePlan, input, resolution);

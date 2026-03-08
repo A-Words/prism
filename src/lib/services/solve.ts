@@ -1,5 +1,6 @@
 import type { ProblemGuide, SolutionPath, SolutionStep } from "@/types";
 import { buildFocusedKnowledgeContext } from "@/lib/ai/context";
+import { normalizeSolutionPathLatex } from "@/lib/ai/latex";
 import { getAIProvider } from "@/lib/ai/provider";
 import { solutionPathAiSchema, solutionPathSchema } from "@/lib/ai/schemas";
 import { getKnowledgeNode } from "@/lib/knowledge-graph";
@@ -809,6 +810,7 @@ async function tryGenerateAiSolution(
         "请输出 5 到 8 个面向学生的思维节点，不要直接给整篇长解。",
         "知识点 ID 必须来自给定知识图谱；如果不确定，优先使用更通用的已知 ID。",
         "必须包含题型说明、前置知识、易错点和递进提示。",
+        "涉及公式时优先使用 $...$ 或 $$...$$；如果偶尔输出裸 LaTeX 命令，系统会兼容处理。",
       ].join("\n"),
       prompt: [
         `题目：${input.problem}`,
@@ -822,10 +824,14 @@ async function tryGenerateAiSolution(
       schema: solutionPathAiSchema,
       temperature: 0.35,
       timeoutMs: 45_000,
+      allowLatex: true,
+      repairJson: true,
     });
 
   return {
-    path: normalizeSolutionPath(object, fallback, input.problem),
+    path: normalizeSolutionPathLatex(
+      normalizeSolutionPath(object, fallback, input.problem)
+    ),
     providerName,
     model,
   };
@@ -834,10 +840,12 @@ async function tryGenerateAiSolution(
 export async function generateSolutionPath(input: GenerateSolutionPathInput) {
   const template = detectTemplate(input.problem);
   const fallback = buildRuleSolutionPath(input.problem, template);
-  const rulePath = solutionPathSchema.parse({
+  const rulePath = normalizeSolutionPathLatex(
+    solutionPathSchema.parse({
     ...fallback,
     edges: createLinearEdges(fallback.steps),
-  });
+    })
+  );
 
   try {
     const aiResult = await tryGenerateAiSolution(input, rulePath, template);

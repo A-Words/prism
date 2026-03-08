@@ -2,6 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import type { ZodTypeAny, z } from "zod";
 import { getModelConfig, isAIConfigured } from "@/lib/ai/context";
+import { repairStructuredJsonText } from "@/lib/ai/latex";
 
 export class AIProviderError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -35,6 +36,9 @@ export interface StructuredGenerationParams<TSchema extends ZodTypeAny> {
   schema: TSchema;
   temperature?: number;
   timeoutMs?: number;
+  allowLatex?: boolean;
+  repairJson?: boolean;
+  mode?: "auto" | "json" | "tool";
 }
 
 export interface StructuredGenerationResult<T> {
@@ -78,6 +82,9 @@ class OpenAICompatibleProvider implements AIProvider {
     schema,
     temperature = 0.3,
     timeoutMs = 20_000,
+    allowLatex = false,
+    repairJson = false,
+    mode,
   }: StructuredGenerationParams<TSchema>): Promise<
     StructuredGenerationResult<z.infer<TSchema>>
   > {
@@ -88,15 +95,36 @@ class OpenAICompatibleProvider implements AIProvider {
     let timer: NodeJS.Timeout | undefined;
 
     try {
-      const result = await Promise.race([
+      const preferredMode = mode || (allowLatex || repairJson ? "auto" : "json");
+      const repairText =
+        allowLatex || repairJson ? repairStructuredJsonText : undefined;
+      const attemptGeneration = async (attemptMode: "auto" | "json" | "tool") =>
         generateObject({
           model: this.client(this.modelId),
-          mode: "json",
+          mode: attemptMode,
           schema,
           system,
           prompt,
           temperature,
-        }),
+          experimental_repairText: repairText,
+        });
+
+      const result = await Promise.race([
+        (async () => {
+          try {
+            return await attemptGeneration(preferredMode);
+          } catch (error) {
+            const message =
+              error instanceof Error ? describeError(error) : String(error);
+            if (
+              preferredMode === "auto" &&
+              message.includes("tool was not called")
+            ) {
+              return attemptGeneration("json");
+            }
+            throw error;
+          }
+        })(),
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
             reject(

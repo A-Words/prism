@@ -22,7 +22,7 @@ export function MathRenderer({ math, display = false, className = "" }: MathRend
         katex.render(math, ref.current, {
           displayMode: display,
           throwOnError: false,
-          trust: true,
+          trust: false,
         });
       } catch {
         if (ref.current) {

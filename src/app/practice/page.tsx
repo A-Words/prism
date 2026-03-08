@@ -607,7 +607,9 @@ function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-500 ml-6">{prereq.reason}</p>
+                <p className="text-xs text-slate-500 ml-6">
+                  <MathText text={prereq.reason} />
+                </p>
               </div>
             );
           })}
@@ -646,7 +648,7 @@ function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
         </div>
         {diagnosis.recoveryTitle && (
           <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {diagnosis.recoveryTitle}
+            <MathText text={diagnosis.recoveryTitle} />
           </div>
         )}
 
@@ -813,7 +815,8 @@ function MicroExerciseCard({
 
       {submitted && (
         <div className="mt-2 text-xs text-slate-500">
-          <span className="font-medium">设计意图：</span>{exercise.purpose}
+          <span className="font-medium">设计意图：</span>
+          <MathText text={exercise.purpose} />
         </div>
       )}
     </div>

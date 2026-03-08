@@ -490,7 +490,10 @@ function SolutionPathView({
                           <span className="font-semibold text-slate-700">
                             {p.name}
                           </span>
-                          <span className="text-slate-500"> — {p.why}</span>
+                          <span className="text-slate-500">
+                            {" — "}
+                            <MathText text={p.why} />
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -510,7 +513,7 @@ function SolutionPathView({
                           <MathText text={m.description} />
                         </div>
                         <div className="text-amber-600">
-                          {m.why}
+                          <MathText text={m.why} />
                         </div>
                       </div>
                     ))}
@@ -528,7 +531,9 @@ function SolutionPathView({
                             <span className="flex items-center justify-center w-4 h-4 rounded-full bg-indigo-100 text-indigo-600 text-[10px] font-bold shrink-0 mt-0.5">
                               {i + 1}
                             </span>
-                            <span className="text-slate-600">{hint}</span>
+                            <span className="text-slate-600">
+                              <MathText text={hint} />
+                            </span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 text-xs text-slate-300">

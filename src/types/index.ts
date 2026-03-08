@@ -81,10 +81,10 @@ export interface SolutionEdge {
 /** 解题引导面板数据 */
 export interface ProblemGuide {
   problemType: string;
-  typeExplanation: string;
+  typeExplanation: string; // 支持 LaTeX
   prerequisites: { id: string; name: string; why: string }[];
   commonMistakes: { description: string; why: string }[];
-  stepHints: string[];   // 递进式提示
+  stepHints: string[];   // 递进式提示，支持 LaTeX
 }
 
 export interface ApiResponseMeta {
@@ -122,17 +122,17 @@ export interface LearningPlanNode {
   phase: number;
   phaseLabel: string;
   estimatedMinutes: number;
-  objectives: string[];
+  objectives: string[]; // 支持 LaTeX
   /** 卡住时退回到哪个节点 */
   backtrackTo?: string;
   /** 为什么把这个节点加入计划 */
-  reason: string;
+  reason: string; // 支持 LaTeX
   /** 这一节点重点学什么 */
-  learnWhat?: string;
+  learnWhat?: string; // 支持 LaTeX
   /** 达到什么标准算学会 */
-  masteryChecks?: string[];
+  masteryChecks?: string[]; // 支持 LaTeX
   /** 常见卡点 */
-  commonMistakes?: string[];
+  commonMistakes?: string[]; // 支持 LaTeX
   /** 明示的前置节点 */
   prerequisiteIds?: string[];
 }
@@ -147,9 +147,9 @@ export interface LearningPhase {
 /** AI 学习规划器的完整输出 */
 export interface LearningPlan {
   /** AI 解读后的学习目标 */
-  goal: string;
+  goal: string; // 支持 LaTeX
   /** AI 对用户意图的理解 */
-  interpretation: string;
+  interpretation: string; // 支持 LaTeX
   /** 分阶段信息 */
   phases: LearningPhase[];
   /** 学习节点（含阶段、退路） */
@@ -163,7 +163,7 @@ export interface LearningPlan {
   }[];
   totalEstimatedMinutes: number;
   /** 个性化建议 */
-  advice: string;
+  advice: string; // 支持 LaTeX
   /** mock 场景 ID */
   sceneId?: string;
   /** 当前目标知识点 */
@@ -179,11 +179,11 @@ export interface LearningPlan {
   /** 生成模式 */
   generationMode?: LearningGenerationMode;
   /** 为什么从这里开始 */
-  whyStartHere?: string;
+  whyStartHere?: string; // 支持 LaTeX
   /** 每日学习安排 */
-  sessionPlan?: string;
+  sessionPlan?: string; // 支持 LaTeX
   /** 当前里程碑 */
-  nextCheckpoint?: string;
+  nextCheckpoint?: string; // 支持 LaTeX
   /** 响应元数据 */
   meta?: ApiResponseMeta;
 }
@@ -233,7 +233,7 @@ export interface MicroExercise {
   options?: string[];
   correctAnswer: string;
   /** 为什么选这道题来练 */
-  purpose: string;
+  purpose: string; // 支持 LaTeX
 }
 
 /** 四段式诊断结果 */
@@ -244,9 +244,9 @@ export interface DiagnosticResult {
 
   // ---- 第一段：你错在哪里 ----
   /** 一句话定位错误（不是"答案错了"，而是具体的错误动作） */
-  errorPinpoint: string;
+  errorPinpoint: string; // 支持 LaTeX
   /** 错在哪一步 */
-  errorStep?: string;
+  errorStep?: string; // 支持 LaTeX
 
   // ---- 第二段：为什么会错 ----
   /** 错误分类 */
@@ -254,21 +254,21 @@ export interface DiagnosticResult {
   /** 错误分类的中文标签 */
   errorCategoryLabel: string;
   /** 为什么会犯这个错误（1-2 句话） */
-  whyWrong: string;
+  whyWrong: string; // 支持 LaTeX
 
   // ---- 第三段：要补哪一层 ----
   /** 需要补的前置知识点（1-2 个，不贪多） */
   prerequisitesToFix: {
     id: string;
     name: string;
-    reason: string;
+    reason: string; // 支持 LaTeX
   }[];
   /** 回溯的知识点路径 */
   backtrackPath: string[];
 
   // ---- 第四段：现在就补 ----
   /** 超短讲解（核心概念的 2-3 句话精讲） */
-  miniLesson: string;
+  miniLesson: string; // 支持 LaTeX
   /** 2 道微练习 */
   microExercises: MicroExercise[];
   /** 1 道回测题 */
@@ -278,13 +278,13 @@ export interface DiagnosticResult {
   errorAnalysis?: string;
   missingKnowledge: string[];
   suggestedReview: string[];
-  explanation: string;
+  explanation: string; // 支持 LaTeX
   /** 诊断后建议回到哪个学习场景 */
   recommendedLearnTargetId?: string;
   /** 诊断后跳转时默认使用的查询词 */
   recommendedLearnQuery?: string;
   /** 首页或诊断卡片展示标题 */
-  recoveryTitle?: string;
+  recoveryTitle?: string; // 支持 LaTeX
   /** 响应元数据 */
   meta?: ApiResponseMeta;
 }

@@ -5,6 +5,7 @@ import type {
   PracticeQuestion,
 } from "@/types";
 import { buildFocusedKnowledgeContext } from "@/lib/ai/context";
+import { normalizeDiagnosticLatex } from "@/lib/ai/latex";
 import { getAIProvider } from "@/lib/ai/provider";
 import {
   diagnosisEnrichmentSchema,
@@ -174,8 +175,8 @@ async function tryEnhanceDiagnosis(
         "你只能补写诊断文案和微练习，不要修改 questionId、错误分类、前置知识、回溯链和推荐学习目标。",
         "输出必须适合学生阅读，避免空泛鼓励。",
         "聚焦当前题目的关键误区，不要展开无关知识图谱。",
-        "输出必须是纯文本 JSON 字段内容，不要使用 Markdown 代码块。",
-        "不要输出 LaTeX 命令或反斜杠写法；例如用 A∩B、{2}、x^2，禁止 \\cap、\\{、\\sqrt 这类写法。",
+        "输出必须是 JSON 字段内容，不要使用 Markdown 代码块。",
+        "涉及公式时优先使用 $...$ 或 $$...$$；如果偶尔输出裸 LaTeX 命令，系统会兼容处理。",
       ].join("\n"),
       prompt: [
         `题目：${question.problem}`,
@@ -193,7 +194,7 @@ async function tryEnhanceDiagnosis(
         "知识图谱上下文：",
         focusedKnowledgeContext,
         "",
-        "写作约束：所有字符串都用自然语言纯文本，不要包含反斜杠或 LaTeX 命令。",
+        "写作约束：正文保持自然语言，公式优先用 $...$ 或 $$...$$ 包起来。",
         "",
         "规则骨架：",
         `- questionId: ${baseDiagnosis.questionId}`,
@@ -210,19 +211,23 @@ async function tryEnhanceDiagnosis(
       schema: diagnosisEnrichmentSchema,
       temperature: 0.25,
       timeoutMs: 45_000,
+      allowLatex: true,
+      repairJson: true,
     });
 
   return {
-    diagnosis: diagnosticResultSchema.parse({
-      ...baseDiagnosis,
-      errorPinpoint: object.errorPinpoint,
-      errorStep: object.errorStep || baseDiagnosis.errorStep,
-      whyWrong: object.whyWrong,
-      miniLesson: object.miniLesson,
-      recoveryTitle: object.recoveryTitle || baseDiagnosis.recoveryTitle,
-      microExercises: object.microExercises,
-      retestQuestion: object.retestQuestion,
-    }),
+    diagnosis: diagnosticResultSchema.parse(
+      normalizeDiagnosticLatex({
+        ...baseDiagnosis,
+        errorPinpoint: object.errorPinpoint,
+        errorStep: object.errorStep || baseDiagnosis.errorStep,
+        whyWrong: object.whyWrong,
+        miniLesson: object.miniLesson,
+        recoveryTitle: object.recoveryTitle || baseDiagnosis.recoveryTitle,
+        microExercises: object.microExercises,
+        retestQuestion: object.retestQuestion,
+      })
+    ),
     providerName,
     model,
   };
@@ -238,9 +243,10 @@ export async function generateDiagnosis(input: GenerateDiagnosisInput) {
     throw new NoDiagnosisNeededError();
   }
 
-  const ruleDiagnosis =
+  const ruleDiagnosis = normalizeDiagnosticLatex(
     getMockDiagnosisByQuestionId(question.id, input.studentAnswer) ||
-    buildRuleDiagnosis(question, input.studentAnswer);
+      buildRuleDiagnosis(question, input.studentAnswer)
+  );
 
   try {
     const aiResult = await tryEnhanceDiagnosis(ruleDiagnosis, question);

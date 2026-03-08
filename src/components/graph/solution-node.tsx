@@ -159,7 +159,9 @@ function SolutionNodeComponent({ data }: NodeProps) {
       {isExpanded && whyThisStep && (
         <div className="mt-3 flex items-start gap-2 text-xs text-indigo-600 bg-indigo-50 rounded-lg p-2.5">
           <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-          <span>{whyThisStep}</span>
+          <span>
+            <MathText text={whyThisStep} />
+          </span>
         </div>
       )}
 
@@ -200,7 +202,7 @@ function SolutionNodeComponent({ data }: NodeProps) {
           <div className="flex items-start gap-2 mb-2">
             <MessageCircleQuestion className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
             <span className="text-sm font-medium text-slate-700">
-              {interactionPoint.question}
+              <MathText text={interactionPoint.question} />
             </span>
           </div>
 
