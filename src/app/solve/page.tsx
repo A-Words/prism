@@ -145,7 +145,7 @@ export default function SolvePage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">解题路径图</h1>
           <p className="text-sm text-slate-500">
-            用固定 mock 解题路径演示“题目 → 步骤图 → 右侧引导”的完整结构
+            输入题目后生成步骤图，并联动右侧题型识别、前置知识和分步提示。
           </p>
         </div>
       </div>
@@ -153,9 +153,9 @@ export default function SolvePage() {
       {/* Problem Input */}
       <div className="glass-card p-5">
         <div className="mb-3 flex items-center gap-2">
-          <span className="badge bg-cyan-100 text-cyan-700">Mock 场景</span>
+          <span className="badge bg-cyan-100 text-cyan-700">结构化生成</span>
           <span className="text-xs text-slate-400">
-            当前返回固定步骤结构，便于演示节点展开、易错点和分步提示。
+            后端会优先调用 AI 生成路径，超时或失败时自动回退到规则模板。
           </span>
         </div>
 
@@ -229,10 +229,10 @@ export default function SolvePage() {
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-3">
               <BookOpen className="h-5 w-5 text-cyan-500" />
-              <h2 className="text-base font-bold text-slate-900">如何演示这个页面</h2>
+              <h2 className="text-base font-bold text-slate-900">如何使用这个页面</h2>
             </div>
             <div className="space-y-3 text-sm text-slate-500">
-              <p>1. 先点“查看示例”或选择一个示例题目，加载固定路径图。</p>
+              <p>1. 先点“查看示例”或选择一个示例题目，快速生成一条路径图。</p>
               <p>2. 展开节点查看“为什么这样做、常见错误、互动问题”。</p>
               <p>3. 右侧引导区会同步展示题型识别、前置知识、易错点和分步提示。</p>
             </div>
@@ -241,11 +241,11 @@ export default function SolvePage() {
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-5 w-5 text-indigo-500" />
-              <h2 className="text-base font-bold text-slate-900">当前示例能力</h2>
+              <h2 className="text-base font-bold text-slate-900">当前页面能力</h2>
             </div>
             <div className="space-y-2 text-sm text-slate-500">
-              <p>固定返回统一的数据结构：步骤图、whyThisStep、interactionPoint、guide。</p>
-              <p>适合先打磨页面结构和交互，再平滑替换成真实接口。</p>
+              <p>统一消费结构化结果：步骤图、whyThisStep、interactionPoint、guide。</p>
+              <p>AI 和规则模板都会落到同一返回结构，页面交互保持一致。</p>
             </div>
           </div>
         </div>

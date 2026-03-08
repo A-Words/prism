@@ -322,7 +322,7 @@ function LearnPageContent() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">学习规划器</h1>
           <p className="text-sm text-slate-500">
-            用固定 mock 场景补齐学习路径、起点选择和当前节点执行区。
+            输入学习目标后，系统会生成路径、推荐起点和当前节点执行区。
           </p>
         </div>
       </div>
@@ -400,7 +400,7 @@ function LearnPageContent() {
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <Lightbulb className="h-4 w-4" />
-            <span>试试这些固定场景：</span>
+            <span>试试这些示例目标：</span>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {EXAMPLE_PROMPTS.map((prompt) => (
@@ -491,7 +491,7 @@ function LoadingState({
         <Sparkles className="absolute -right-1 -top-1 h-5 w-5 animate-pulse text-amber-400" />
       </div>
       <h3 className="mb-2 text-lg font-semibold text-slate-700">
-        {generationMode === "assessment" ? "正在准备起点测试建议…" : "正在加载固定学习场景…"}
+        {generationMode === "assessment" ? "正在准备起点测试建议…" : "正在生成学习路径…"}
       </h3>
       <p className="text-sm text-slate-400">
         匹配场景、装载路径摘要、定位当前推荐节点

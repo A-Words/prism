@@ -24,7 +24,7 @@
 | UI | Tailwind CSS 4, Lucide Icons, 毛玻璃设计语言 |
 | 图可视化 | React Flow (@xyflow/react v12) |
 | 数学渲染 | KaTeX |
-| AI | Vercel AI SDK + OpenAI (结构化输出) |
+| AI | Vercel AI SDK + OpenAI Compatible Provider (结构化输出) |
 | 状态 | Zustand (持久化到 localStorage) |
 | 类型 | TypeScript 5, Zod Schema |
 
@@ -50,9 +50,9 @@
 # 安装依赖
 npm install
 
-# 配置 AI（可选，不配置则使用演示数据）
+# 配置 AI（可选，不配置则自动走规则兜底）
 cp .env.local.example .env.local
-# 编辑 .env.local 填入 OpenAI API Key
+# 编辑 .env.local 填入 OpenAI 或兼容接口的配置
 
 # 启动开发服务器
 npm run dev
@@ -83,10 +83,13 @@ src/
 │   └── ui/math-renderer.tsx    # KaTeX 数学渲染
 ├── lib/
 │   ├── knowledge-graph.ts      # 知识图谱数据与算法
-│   ├── mock-data.ts            # 演示数据
+│   ├── mock-data.ts            # 题库 / 规则兜底 / 演示数据
 │   ├── store.ts                # Zustand 状态管理
 │   ├── utils.ts                # 工具函数
-│   └── ai/context.ts           # AI 上下文构建
+│   ├── ai/context.ts           # AI 上下文构建
+│   ├── ai/provider.ts          # OpenAI 兼容 Provider 抽象
+│   ├── ai/schemas.ts           # 结构化输出 Schema
+│   └── services/               # learn-path / solve / diagnose 服务层
 └── types/index.ts              # TypeScript 类型定义
 ```
 
@@ -94,10 +97,10 @@ src/
 
 | 模式 | 条件 | 行为 |
 |------|------|------|
-| **完整模式** | 配置了 `OPENAI_API_KEY` | AI 实时分析题目、生成路径、诊断错误 |
-| **演示模式** | 未配置 API Key | 使用内置演示数据，展示完整交互流程 |
+| **AI 模式** | 配置了 `OPENAI_API_KEY` | 三条 API 优先走结构化 AI 生成，失败时自动回退到规则层 |
+| **规则兜底模式** | 未配置 API Key | 学习路径、解题路径、诊断均返回可用的结构化规则结果 |
 
-两种模式下 UI 完全一致，演示模式可立即体验所有功能。
+两种模式下 UI 完全一致。所有响应都会附带 `meta` 字段，标记当前结果来自 `ai` 还是 `rule`，以及是否发生降级。
 
 ## License
 

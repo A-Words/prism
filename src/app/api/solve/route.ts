@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
-import { mockSolutionPath } from "@/lib/mock-data";
+import { z } from "zod";
+import { createRequestId } from "@/lib/services/meta";
+import { generateSolutionPath } from "@/lib/services/solve";
+
+const requestSchema = z.object({
+  problem: z.string().min(1),
+});
 
 export async function POST(request: Request) {
   try {
-    const { problem } = await request.json();
+    const requestId = createRequestId();
+    const { problem } = requestSchema.parse(await request.json());
 
     if (!problem || typeof problem !== "string") {
       return NextResponse.json(
@@ -12,13 +19,26 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      ...mockSolutionPath,
-      problem: problem.trim() || mockSolutionPath.problem,
+    const solutionPath = await generateSolutionPath({
+      problem: problem.trim(),
+      requestId,
     });
-  } catch {
+
+    return NextResponse.json(solutionPath);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "请提供有效的题目" },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: "生成解题路径失败，请稍后重试" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "生成解题路径失败，请稍后重试",
+      },
       { status: 500 }
     );
   }

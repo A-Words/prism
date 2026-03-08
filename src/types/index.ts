@@ -87,6 +87,15 @@ export interface ProblemGuide {
   stepHints: string[];   // 递进式提示
 }
 
+export interface ApiResponseMeta {
+  source: "ai" | "rule";
+  degraded: boolean;
+  provider?: string;
+  model?: string;
+  reason?: string;
+  requestId: string;
+}
+
 export interface SolutionPath {
   problem: string;
   problemType: string;
@@ -97,6 +106,8 @@ export interface SolutionPath {
   relatedKnowledge: string[];
   /** 解题引导面板 */
   guide?: ProblemGuide;
+  /** 响应元数据 */
+  meta?: ApiResponseMeta;
 }
 
 // ---- 学习规划 ----
@@ -173,6 +184,8 @@ export interface LearningPlan {
   sessionPlan?: string;
   /** 当前里程碑 */
   nextCheckpoint?: string;
+  /** 响应元数据 */
+  meta?: ApiResponseMeta;
 }
 
 // 保留旧类型作兼容
@@ -272,6 +285,8 @@ export interface DiagnosticResult {
   recommendedLearnQuery?: string;
   /** 首页或诊断卡片展示标题 */
   recoveryTitle?: string;
+  /** 响应元数据 */
+  meta?: ApiResponseMeta;
 }
 
 export const ERROR_CATEGORY_LABELS: Record<ErrorCategory, string> = {

@@ -1,15 +1,26 @@
 import { NextResponse } from "next/server";
-import { getMockLearningPlan, resolveMockLearningScenario } from "@/lib/mock-data";
+import { z } from "zod";
+import { createRequestId } from "@/lib/services/meta";
+import { generateLearningPlan } from "@/lib/services/learn-path";
+
+const requestSchema = z.object({
+  query: z.string().optional(),
+  targetId: z.string().optional(),
+  baseLevel: z.enum(["zero", "basic", "sprint"]).optional(),
+  goalLevel: z.enum(["concept", "basic-problems", "comprehensive"]).optional(),
+  generationMode: z.enum(["quick", "assessment"]).optional(),
+});
 
 export async function POST(request: Request) {
   try {
+    const requestId = createRequestId();
     const {
       query,
       targetId,
       baseLevel,
       goalLevel,
       generationMode,
-    } = await request.json();
+    } = requestSchema.parse(await request.json());
 
     if (
       (!query || typeof query !== "string" || query.trim().length === 0) &&
@@ -21,23 +32,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const scenario = resolveMockLearningScenario({
+    const plan = await generateLearningPlan({
       query: typeof query === "string" ? query : undefined,
       targetId: typeof targetId === "string" ? targetId : undefined,
-    });
-
-    const plan = getMockLearningPlan({
-      query: typeof query === "string" ? query : scenario.title,
-      targetId: scenario.targetId,
       baseLevel,
       goalLevel,
       generationMode,
+      requestId,
     });
 
     return NextResponse.json(plan);
-  } catch {
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "学习路径请求参数不合法" },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
-      { error: "生成学习计划时出错，请稍后重试" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "生成学习计划时出错，请稍后重试",
+      },
       { status: 500 }
     );
   }

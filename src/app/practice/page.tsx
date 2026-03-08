@@ -142,7 +142,7 @@ export default function PracticePage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">练习诊断</h1>
           <p className="text-sm text-slate-500">
-            用固定诊断场景演示错因定位、回补练习和回测闭环
+            提交作答后返回错因定位、回补练习和回测闭环。
           </p>
         </div>
       </div>
@@ -417,12 +417,12 @@ export default function PracticePage() {
             </h3>
             <div className="space-y-3 text-sm text-slate-500">
               <p>
-                <span className="font-medium text-slate-700">固定诊断：</span>
-                每道题都绑定了固定诊断场景，演示“错因 → 回补 → 回测”的完整闭环。
+                <span className="font-medium text-slate-700">诊断闭环：</span>
+                答错后会生成“错因 → 回补 → 回测”的完整结构化反馈。
               </p>
               <p>
                 <span className="font-medium text-slate-700">回溯路径：</span>
-                诊断会直接指向对应学习场景，回到前置知识页可继续演示。
+                诊断会直接指向对应学习路径，回到前置知识页可继续推进。
               </p>
               <p>
                 <span className="font-medium text-slate-700">渐进提示：</span>
