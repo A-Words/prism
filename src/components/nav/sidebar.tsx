@@ -2,17 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
-  LayoutDashboard,
-  Route,
-  GraduationCap,
   ClipboardCheck,
-  ChevronLeft,
-  ChevronRight,
+  GraduationCap,
+  LayoutDashboard,
+  Menu,
+  Route,
   Sparkles,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 
 const navItems = [
   {
@@ -41,36 +41,24 @@ const navItems = [
   },
 ];
 
-export function Sidebar() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <aside
-      className={cn(
-        "fixed left-0 top-0 bottom-0 z-40 flex flex-col border-r border-slate-200/60 bg-white/80 backdrop-blur-xl transition-all duration-300",
-        collapsed ? "w-[72px]" : "w-[240px]"
-      )}
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-6 border-b border-slate-100">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200">
-          <Sparkles className="h-5 w-5" />
-        </div>
-        {!collapsed && (
-          <div className="animate-fade-in">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-              Prism
-            </h1>
-            <p className="text-[11px] text-slate-400 font-medium">
-              数学学习导航
-            </p>
+    <div className="flex h-full flex-col bg-white/90 backdrop-blur-xl">
+      <div className="border-b border-slate-100 px-5 py-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-200">
+            <Sparkles className="h-5 w-5" />
           </div>
-        )}
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-slate-900">Prism</h1>
+            <p className="text-[11px] font-medium text-slate-400">数学学习导航</p>
+          </div>
+        </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -79,8 +67,9 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200",
                 isActive
                   ? "bg-indigo-50 text-indigo-700 shadow-sm"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -92,37 +81,56 @@ export function Sidebar() {
                   isActive ? "text-indigo-600" : "text-slate-400"
                 )}
               />
-              {!collapsed && (
-                <div className="animate-fade-in">
-                  <div>{item.label}</div>
-                  {isActive && (
-                    <div className="text-[11px] text-indigo-400 font-normal">
-                      {item.description}
-                    </div>
-                  )}
+              <div>
+                <div>{item.label}</div>
+                <div className={cn("text-[11px] font-normal", isActive ? "text-indigo-400" : "text-slate-400")}>
+                  {item.description}
                 </div>
-              )}
+              </div>
             </Link>
           );
         })}
       </nav>
+    </div>
+  );
+}
 
-      {/* Collapse Toggle */}
-      <div className="px-3 py-4 border-t border-slate-100">
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center justify-center w-full gap-2 px-3 py-2 rounded-xl text-sm text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <>
-              <ChevronLeft className="h-4 w-4" />
-              <span>收起</span>
-            </>
-          )}
-        </button>
-      </div>
-    </aside>
+export function Sidebar() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[240px] border-r border-slate-200/60 lg:block">
+        <SidebarContent />
+      </aside>
+
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur lg:hidden"
+        aria-label="打开导航"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            className="absolute inset-0 bg-slate-900/30 backdrop-blur-[1px]"
+            onClick={() => setMobileOpen(false)}
+            aria-label="关闭导航遮罩"
+          />
+          <div className="absolute inset-y-0 left-0 w-[86vw] max-w-[300px] border-r border-slate-200/60 shadow-xl">
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500"
+              aria-label="关闭导航"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <SidebarContent onNavigate={() => setMobileOpen(false)} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

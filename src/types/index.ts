@@ -101,6 +101,10 @@ export interface SolutionPath {
 
 // ---- 学习规划 ----
 
+export type LearningBaseLevel = "zero" | "basic" | "sprint";
+export type LearningGoalLevel = "concept" | "basic-problems" | "comprehensive";
+export type LearningGenerationMode = "quick" | "assessment";
+
 /** AI 学习规划器输出的单个节点 */
 export interface LearningPlanNode {
   knowledgeId: string;
@@ -112,6 +116,14 @@ export interface LearningPlanNode {
   backtrackTo?: string;
   /** 为什么把这个节点加入计划 */
   reason: string;
+  /** 这一节点重点学什么 */
+  learnWhat?: string;
+  /** 达到什么标准算学会 */
+  masteryChecks?: string[];
+  /** 常见卡点 */
+  commonMistakes?: string[];
+  /** 明示的前置节点 */
+  prerequisiteIds?: string[];
 }
 
 /** 学习规划的阶段描述 */
@@ -141,6 +153,26 @@ export interface LearningPlan {
   totalEstimatedMinutes: number;
   /** 个性化建议 */
   advice: string;
+  /** mock 场景 ID */
+  sceneId?: string;
+  /** 当前目标知识点 */
+  targetKnowledgeId?: string;
+  /** 推荐起点 */
+  recommendedStartId?: string;
+  /** 当前执行节点 */
+  currentNodeId?: string;
+  /** 学习基础 */
+  baseLevel?: LearningBaseLevel;
+  /** 学习目标层级 */
+  goalLevel?: LearningGoalLevel;
+  /** 生成模式 */
+  generationMode?: LearningGenerationMode;
+  /** 为什么从这里开始 */
+  whyStartHere?: string;
+  /** 每日学习安排 */
+  sessionPlan?: string;
+  /** 当前里程碑 */
+  nextCheckpoint?: string;
 }
 
 // 保留旧类型作兼容
@@ -234,6 +266,12 @@ export interface DiagnosticResult {
   missingKnowledge: string[];
   suggestedReview: string[];
   explanation: string;
+  /** 诊断后建议回到哪个学习场景 */
+  recommendedLearnTargetId?: string;
+  /** 诊断后跳转时默认使用的查询词 */
+  recommendedLearnQuery?: string;
+  /** 首页或诊断卡片展示标题 */
+  recoveryTitle?: string;
 }
 
 export const ERROR_CATEGORY_LABELS: Record<ErrorCategory, string> = {
@@ -254,6 +292,18 @@ export const ERROR_CATEGORY_COLORS: Record<ErrorCategory, string> = {
   careless: "#64748b",
 };
 
+export interface LearningPathProgress {
+  targetId: string;
+  targetName: string;
+  currentNodeId: string;
+  currentStep: number;
+  totalSteps: number;
+  completedNodeIds: string[];
+  startedAt: string;
+  updatedAt: string;
+  status: "active" | "completed";
+}
+
 export interface StudentProgress {
   knowledge: Record<string, StudentKnowledge>;
   practiceHistory: {
@@ -262,11 +312,7 @@ export interface StudentProgress {
     isCorrect: boolean;
     timestamp: string;
   }[];
-  learningPaths: {
-    targetId: string;
-    currentStep: number;
-    startedAt: string;
-  }[];
+  learningPaths: LearningPathProgress[];
 }
 
 // ---- UI 状态 ----
@@ -276,6 +322,8 @@ export interface AppState {
   progress: StudentProgress;
   updateMastery: (nodeId: string, correct: boolean) => void;
   addPracticeRecord: (record: StudentProgress["practiceHistory"][0]) => void;
+  upsertLearningPath: (path: LearningPathProgress) => void;
+  completeLearningPathStep: (targetId: string, completedNodeId: string, nextNodeId?: string) => void;
   getMastery: (nodeId: string) => MasteryLevel;
   getMasteryScore: (nodeId: string) => number;
 
@@ -290,6 +338,23 @@ export interface AppState {
   // 诊断状态
   currentDiagnosis: DiagnosticResult | null;
   setCurrentDiagnosis: (result: DiagnosticResult | null) => void;
+}
+
+export interface MockLearningScenario {
+  id: string;
+  title: string;
+  queryAliases: string[];
+  targetId: string;
+  dashboardTitle: string;
+  dashboardReason: string;
+  dashboardTask: string;
+  plan: LearningPlan;
+}
+
+export interface MockDiagnosisScenario {
+  questionId: string;
+  title: string;
+  result: DiagnosticResult;
 }
 
 // ---- 颜色映射 ----

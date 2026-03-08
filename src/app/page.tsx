@@ -20,19 +20,19 @@ import {
   Brain,
   Play,
 } from "lucide-react";
-import { knowledgeNodes } from "@/lib/knowledge-graph";
+import { getKnowledgeNode, knowledgeNodes } from "@/lib/knowledge-graph";
 import {
   useAppStore,
   getWeakPoints,
+  getLatestDiagnosisRecord,
   getRecentPractice,
   getDailyRecommendation,
 } from "@/lib/store";
-import { mockQuestions } from "@/lib/mock-data";
+import { getLearnHref, getMockQuestionById, mockQuestions } from "@/lib/mock-data";
 import {
   CATEGORY_COLORS,
   CATEGORY_LABELS,
   MASTERY_COLORS,
-  MASTERY_LABELS,
   type KnowledgeCategory,
 } from "@/types";
 
@@ -42,6 +42,7 @@ export default function HomePage() {
 
   const weakPoints = getWeakPoints(progress);
   const recentPractice = getRecentPractice(progress, 5);
+  const latestDiagnosis = getLatestDiagnosisRecord(progress);
   const recommendation = getDailyRecommendation(progress);
 
   const totalPracticed = progress.practiceHistory.length;
@@ -131,7 +132,7 @@ export default function HomePage() {
             <div className="space-y-3">
               {/* Continue learning path */}
               {recommendation.continuePath ? (
-                <Link href="/learn" className="task-card flex items-center gap-4 group">
+                <Link href={recommendation.continuePath.href} className="task-card flex items-center gap-4 group">
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-50 shrink-0">
                     <RotateCcw className="w-5 h-5 text-indigo-500" />
                   </div>
@@ -167,7 +168,7 @@ export default function HomePage() {
               {recommendation.recommendedKnowledge.map((k) => (
                 <Link
                   key={k.id}
-                  href={`/learn?target=${k.id}`}
+                  href={k.href}
                   className="task-card flex items-center gap-4 group"
                 >
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-50 shrink-0">
@@ -256,7 +257,7 @@ export default function HomePage() {
                       </div>
                     </div>
                     <Link
-                      href={`/learn?target=${wp.nodeId}`}
+                      href={getLearnHref(wp.nodeId, wp.nodeName)}
                       className="text-xs text-indigo-500 hover:text-indigo-700 font-medium whitespace-nowrap"
                     >
                       去巩固 →
@@ -286,15 +287,65 @@ export default function HomePage() {
           <section className="dashboard-section">
             <div className="flex items-center gap-2 mb-4">
               <ClipboardCheck className="w-5 h-5 text-blue-500" />
-              <h2 className="text-base font-bold text-slate-900">最近练习</h2>
+              <h2 className="text-base font-bold text-slate-900">最近诊断</h2>
             </div>
 
-            {recentPractice.length > 0 ? (
+            {latestDiagnosis ? (
+              <div className="space-y-4">
+                <Link
+                  href={latestDiagnosis.href}
+                  className="block rounded-2xl border border-blue-200 bg-blue-50/80 p-4 transition-colors hover:border-blue-300"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-slate-800">
+                        {latestDiagnosis.diagnosis.recoveryTitle || "回到前置知识继续补强"}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        错因：{latestDiagnosis.diagnosis.errorCategoryLabel} · 推荐回补：
+                        {getKnowledgeNode(latestDiagnosis.diagnosis.recommendedLearnTargetId || "")?.name ||
+                          "学习路径"}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+                <div className="space-y-2">
+                  {recentPractice.map((record) => {
+                    const question = getMockQuestionById(record.questionId);
+                    return (
+                      <div
+                        key={`${record.questionId}-${record.timestamp}`}
+                        className="flex items-start gap-3 py-2.5 border-b border-slate-50 last:border-0"
+                      >
+                        {record.isCorrect ? (
+                          <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4.5 h-4.5 text-rose-500 shrink-0 mt-0.5" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-slate-700 truncate">
+                            {question
+                              ? question.problem.replace(/\$[^$]*\$/g, "…").slice(0, 30)
+                              : `题目 ${record.questionId}`}
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            {record.isCorrect ? "正确" : "错误"} ·{" "}
+                            {new Date(record.timestamp).toLocaleDateString("zh-CN", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : recentPractice.length > 0 ? (
               <div className="space-y-2">
                 {recentPractice.map((record) => {
-                  const question = mockQuestions.find(
-                    (q) => q.id === record.questionId
-                  );
+                  const question = mockQuestions.find((q) => q.id === record.questionId);
                   return (
                     <div
                       key={`${record.questionId}-${record.timestamp}`}
@@ -326,7 +377,7 @@ export default function HomePage() {
             ) : (
               <div className="text-center py-6 text-sm text-slate-400">
                 <Clock className="w-6 h-6 mx-auto mb-2 text-slate-300" />
-                <p>还没有练习记录</p>
+                <p>还没有诊断记录</p>
               </div>
             )}
           </section>

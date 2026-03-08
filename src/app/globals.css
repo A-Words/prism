@@ -49,6 +49,7 @@
     background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f0f9ff 100%);
     min-height: 100vh;
     color: #1e293b;
+    overflow-x: hidden;
   }
 
   ::selection {
@@ -221,9 +222,10 @@
   }
 
   .weak-point-tag {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 8px;
+    width: 100%;
     padding: 10px 16px;
     border-radius: 12px;
     border: 1px solid;
@@ -656,9 +658,10 @@
   transition: all 0.15s;
 }
 
-.micro-exercise-option:disabled {
-  cursor: default;
-}
+  .micro-exercise-option:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
 
 .micro-option-letter {
   display: flex;
@@ -670,4 +673,19 @@
   font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
+}
+
+@media (max-width: 1023px) {
+  .dashboard-section {
+    padding: 18px;
+  }
+
+  .solution-step-node {
+    max-width: 280px;
+    padding: 14px 18px;
+  }
+
+  .glass-card {
+    border-radius: 14px;
+  }
 }

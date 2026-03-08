@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
   AppState,
+  LearningPathProgress,
   MasteryLevel,
   StudentProgress,
   SolutionPath,
@@ -11,6 +12,12 @@ import type {
 } from "@/types";
 import { scoreToMastery } from "@/lib/utils";
 import { knowledgeNodes } from "@/lib/knowledge-graph";
+import {
+  getDashboardLearningCards,
+  getLatestDiagnosisSummary,
+  getLearnHref,
+  resolveMockLearningScenario,
+} from "@/lib/mock-data";
 
 const defaultProgress: StudentProgress = {
   knowledge: {},
@@ -34,10 +41,11 @@ export interface DailyRecommendation {
   continuePath?: {
     targetId: string;
     targetName: string;
+    href: string;
     currentStep: number;
     totalSteps: number;
   };
-  recommendedKnowledge: { id: string; name: string; reason: string }[];
+  recommendedKnowledge: { id: string; name: string; reason: string; href: string }[];
   practiceCount: number;
 }
 
@@ -84,6 +92,60 @@ export const useAppStore = create<AppState>()(
             practiceHistory: [...state.progress.practiceHistory, record],
           },
         }));
+      },
+
+      upsertLearningPath: (path) => {
+        set((state) => {
+          const existing = state.progress.learningPaths.findIndex(
+            (item) => item.targetId === path.targetId
+          );
+          const nextPaths =
+            existing >= 0
+              ? state.progress.learningPaths.map((item, index) =>
+                  index === existing ? path : item
+                )
+              : [...state.progress.learningPaths, path];
+
+          return {
+            progress: {
+              ...state.progress,
+              learningPaths: nextPaths,
+            },
+          };
+        });
+      },
+
+      completeLearningPathStep: (targetId, completedNodeId, nextNodeId) => {
+        set((state) => {
+          const nextPaths = state.progress.learningPaths.map((path) => {
+            if (path.targetId !== targetId) {
+              return path;
+            }
+
+            const completedNodeIds = Array.from(
+              new Set([...path.completedNodeIds, completedNodeId])
+            );
+            const reachedEnd = !nextNodeId || completedNodeIds.length >= path.totalSteps;
+
+            return {
+              ...path,
+              completedNodeIds,
+              currentNodeId: nextNodeId || completedNodeId,
+              currentStep: reachedEnd
+                ? path.totalSteps
+                : Math.min(path.currentStep + 1, path.totalSteps),
+              status: reachedEnd ? ("completed" as const) : ("active" as const),
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            progress: {
+              ...state.progress,
+              learningPaths: nextPaths,
+            },
+          };
+        });
       },
 
       getMastery: (nodeId: string) => {
@@ -173,70 +235,76 @@ export function getRecentPractice(
 export function getDailyRecommendation(
   progress: StudentProgress
 ): DailyRecommendation {
-  // Continue last learning path
   const activePath = progress.learningPaths.length > 0
-    ? progress.learningPaths[progress.learningPaths.length - 1]
+    ? [...progress.learningPaths]
+        .reverse()
+        .find((path) => path.status === "active")
     : undefined;
 
   let continuePath: DailyRecommendation["continuePath"];
   if (activePath) {
-    const node = knowledgeNodes.find((n) => n.id === activePath.targetId);
-    if (node) {
-      continuePath = {
-        targetId: activePath.targetId,
-        targetName: node.name,
-        currentStep: activePath.currentStep,
-        totalSteps: 5, // approximation
-      };
-    }
+    continuePath = {
+      targetId: activePath.targetId,
+      targetName: activePath.targetName,
+      href: getLearnHref(activePath.targetId, activePath.targetName),
+      currentStep: activePath.currentStep,
+      totalSteps: activePath.totalSteps,
+    };
   }
 
-  // Recommend knowledge points: pick ones that are "medium" or have prerequisites mastered
-  const unmastered = knowledgeNodes.filter((n) => {
-    const k = progress.knowledge[n.id];
-    if (!k) return true;
-    return k.mastery === "none" || k.mastery === "low" || k.mastery === "medium";
-  });
-
-  // Prefer nodes whose prerequisites are already mastered
-  const withReadiness = unmastered.map((n) => {
-    const prereqsMastered = n.prerequisites.every((pid) => {
-      const k = progress.knowledge[pid];
-      return k && (k.mastery === "high" || k.mastery === "full");
+  const weakPoints = getWeakPoints(progress);
+  const weakRecommendations = weakPoints
+    .slice(0, 2)
+    .map((weak) => {
+      const scenario = resolveMockLearningScenario({ targetId: weak.nodeId });
+      return {
+        id: scenario.targetId,
+        name: scenario.dashboardTitle,
+        reason: `优先补「${weak.nodeName}」：${weak.reason}`,
+        href: getLearnHref(scenario.targetId, scenario.title),
+      };
     });
-    const partialPrereqs = n.prerequisites.filter((pid) => {
-      const k = progress.knowledge[pid];
-      return k && k.mastery !== "none";
-    }).length;
-    return {
-      node: n,
-      ready: prereqsMastered,
-      partialScore: n.prerequisites.length > 0
-        ? partialPrereqs / n.prerequisites.length
-        : 0.5,
-    };
-  });
 
-  withReadiness.sort((a, b) => {
-    if (a.ready !== b.ready) return a.ready ? -1 : 1;
-    return b.partialScore - a.partialScore;
-  });
+  const featuredRecommendations = getDashboardLearningCards()
+    .filter(
+      (card) => !weakRecommendations.some((item) => item.id === card.id)
+    )
+    .slice(0, Math.max(0, 2 - weakRecommendations.length));
 
-  const recommended = withReadiness.slice(0, 2).map((w) => ({
-    id: w.node.id,
-    name: w.node.name,
-    reason: w.ready
-      ? "前置知识已掌握，可以学习"
-      : `难度 ${"★".repeat(w.node.difficulty)}，适合当前水平`,
-  }));
+  const recommended = [...weakRecommendations, ...featuredRecommendations];
 
-  // Suggest practice count based on weak points
-  const weakCount = getWeakPoints(progress).length;
+  const weakCount = weakPoints.length;
   const practiceCount = Math.max(3, weakCount * 2);
 
   return {
     continuePath,
     recommendedKnowledge: recommended,
     practiceCount,
+  };
+}
+
+export function getLatestDiagnosisRecord(progress: StudentProgress) {
+  const latestWrong = [...progress.practiceHistory]
+    .reverse()
+    .find((record) => !record.isCorrect);
+  if (!latestWrong) {
+    return undefined;
+  }
+
+  const diagnosis = getLatestDiagnosisSummary(latestWrong.questionId);
+  if (!diagnosis) {
+    return undefined;
+  }
+
+  return {
+    questionId: latestWrong.questionId,
+    createdAt: latestWrong.timestamp,
+    diagnosis,
+    href: diagnosis.recommendedLearnTargetId
+      ? getLearnHref(
+          diagnosis.recommendedLearnTargetId,
+          diagnosis.recommendedLearnQuery
+        )
+      : "/learn",
   };
 }

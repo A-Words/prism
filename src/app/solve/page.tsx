@@ -19,16 +19,13 @@ import {
   Sparkles,
   BookOpen,
   ChevronRight,
-  ChevronLeft,
   PanelRightOpen,
   PanelRightClose,
-  AlertTriangle,
-  ArrowRightLeft,
   GraduationCap,
-  Lightbulb,
   Eye,
   EyeOff,
   Footprints,
+  RotateCcw,
 } from "lucide-react";
 import { SolutionNode } from "@/components/graph/solution-node";
 import type { SolutionNodeData } from "@/components/graph/solution-node";
@@ -41,12 +38,15 @@ import {
   CATEGORY_COLORS,
   CATEGORY_LABELS,
   type SolutionPath,
-  type SolutionStepType,
   type SolutionStepState,
-  type ProblemGuide,
 } from "@/types";
 
 const nodeTypes = { solutionStep: SolutionNode };
+const EXAMPLE_PROBLEMS = [
+  "解不等式 x² - 3x + 2 < 0",
+  "已知 sin x + cos x = √2，求 sin 2x 的值",
+  "若 P(A)=0.6，P(B)=0.5，P(A∩B)=0.3，求 P(A|B)",
+];
 
 export default function SolvePage() {
   const [problem, setProblem] = useState("");
@@ -102,7 +102,15 @@ export default function SolvePage() {
   const handleDemo = useCallback(() => {
     setProblem("解不等式 x² - 3x + 2 < 0");
     setSolutionPath(mockSolutionPath);
+    setExpandedStep(null);
     initMockStates();
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setProblem("");
+    setSolutionPath(null);
+    setExpandedStep(null);
+    setStepStates({});
   }, []);
 
   const handleStepStateChange = useCallback(
@@ -137,13 +145,20 @@ export default function SolvePage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">解题路径图</h1>
           <p className="text-sm text-slate-500">
-            输入题目，AI 生成思维导图式的解题路径——每一步都告诉你"为什么"
+            用固定 mock 解题路径演示“题目 → 步骤图 → 右侧引导”的完整结构
           </p>
         </div>
       </div>
 
       {/* Problem Input */}
       <div className="glass-card p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="badge bg-cyan-100 text-cyan-700">Mock 场景</span>
+          <span className="text-xs text-slate-400">
+            当前返回固定步骤结构，便于演示节点展开、易错点和分步提示。
+          </span>
+        </div>
+
         <div className="flex gap-3">
           <div className="flex-1">
             <textarea
@@ -158,10 +173,32 @@ export default function SolvePage() {
               }}
             />
             <div className="flex items-center justify-between mt-3">
-              <span className="text-xs text-slate-400">
-                支持 LaTeX 语法，Ctrl+Enter 提交
-              </span>
-              <div className="flex gap-2">
+              <div className="space-y-2">
+                <span className="text-xs text-slate-400 block">
+                  支持 LaTeX 语法，Ctrl+Enter 提交
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {EXAMPLE_PROBLEMS.map((example) => (
+                    <button
+                      key={example}
+                      onClick={() => setProblem(example)}
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 transition-colors hover:border-cyan-200 hover:text-cyan-700"
+                    >
+                      {example}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                {solutionPath && (
+                  <button
+                    onClick={handleReset}
+                    className="btn-secondary text-sm py-2 px-4"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    重置视图
+                  </button>
+                )}
                 <button
                   onClick={handleDemo}
                   className="btn-secondary text-sm py-2 px-4"
@@ -186,6 +223,33 @@ export default function SolvePage() {
           </div>
         </div>
       </div>
+
+      {!solutionPath && (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="glass-card p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <BookOpen className="h-5 w-5 text-cyan-500" />
+              <h2 className="text-base font-bold text-slate-900">如何演示这个页面</h2>
+            </div>
+            <div className="space-y-3 text-sm text-slate-500">
+              <p>1. 先点“查看示例”或选择一个示例题目，加载固定路径图。</p>
+              <p>2. 展开节点查看“为什么这样做、常见错误、互动问题”。</p>
+              <p>3. 右侧引导区会同步展示题型识别、前置知识、易错点和分步提示。</p>
+            </div>
+          </div>
+
+          <div className="glass-card p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-5 w-5 text-indigo-500" />
+              <h2 className="text-base font-bold text-slate-900">当前示例能力</h2>
+            </div>
+            <div className="space-y-2 text-sm text-slate-500">
+              <p>固定返回统一的数据结构：步骤图、whyThisStep、interactionPoint、guide。</p>
+              <p>适合先打磨页面结构和交互，再平滑替换成真实接口。</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Solution Path visualization + Guide Sidebar */}
       {solutionPath && (

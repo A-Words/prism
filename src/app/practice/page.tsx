@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   ReactFlow,
   Controls,
@@ -35,8 +36,12 @@ import {
 import { DiagnosticNode } from "@/components/graph/diagnostic-node";
 import type { DiagnosticNodeData } from "@/components/graph/diagnostic-node";
 import { MathText } from "@/components/ui/math-renderer";
-import { mockQuestions, mockDiagnosis } from "@/lib/mock-data";
-import { getKnowledgeNode, getAllPrerequisites } from "@/lib/knowledge-graph";
+import {
+  getLearnHref,
+  getMockDiagnosisByQuestionId,
+  mockQuestions,
+} from "@/lib/mock-data";
+import { getKnowledgeNode } from "@/lib/knowledge-graph";
 import { useAppStore } from "@/lib/store";
 import type { PracticeQuestion, DiagnosticResult, MicroExercise } from "@/types";
 import {
@@ -49,6 +54,7 @@ import {
 const nodeTypes = { diagnosticNode: DiagnosticNode };
 
 export default function PracticePage() {
+  const router = useRouter();
   const [currentQuestion, setCurrentQuestion] = useState<PracticeQuestion>(
     mockQuestions[0]
   );
@@ -97,11 +103,10 @@ export default function PracticePage() {
           const data = await res.json();
           setDiagnosis(data);
         } else {
-          // Use mock diagnosis
-          setDiagnosis(mockDiagnosis);
+          setDiagnosis(getMockDiagnosisByQuestionId(currentQuestion.id, selectedAnswer) || null);
         }
       } catch {
-        setDiagnosis(mockDiagnosis);
+        setDiagnosis(getMockDiagnosisByQuestionId(currentQuestion.id, selectedAnswer) || null);
       }
     }
 
@@ -137,7 +142,7 @@ export default function PracticePage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">练习诊断</h1>
           <p className="text-sm text-slate-500">
-            智能诊断薄弱环节，动态回溯前置知识
+            用固定诊断场景演示错因定位、回补练习和回测闭环
           </p>
         </div>
       </div>
@@ -286,7 +291,16 @@ export default function PracticePage() {
                         开始补救练习
                       </button>
                       <button
-                        onClick={() => window.location.href = "/learn"}
+                        onClick={() =>
+                          router.push(
+                            diagnosis.recommendedLearnTargetId
+                              ? getLearnHref(
+                                  diagnosis.recommendedLearnTargetId,
+                                  diagnosis.recommendedLearnQuery
+                                )
+                              : "/learn"
+                          )
+                        }
                         className="btn-secondary text-sm py-2 px-4"
                       >
                         <ArrowLeftCircle className="w-4 h-4" />
@@ -403,12 +417,12 @@ export default function PracticePage() {
             </h3>
             <div className="space-y-3 text-sm text-slate-500">
               <p>
-                <span className="font-medium text-slate-700">智能诊断：</span>
-                答错后，AI 将分析你的错误原因，精确定位薄弱知识点。
+                <span className="font-medium text-slate-700">固定诊断：</span>
+                每道题都绑定了固定诊断场景，演示“错因 → 回补 → 回测”的完整闭环。
               </p>
               <p>
                 <span className="font-medium text-slate-700">回溯路径：</span>
-                系统自动追溯到需要补强的前置知识，生成回溯路径图。
+                诊断会直接指向对应学习场景，回到前置知识页可继续演示。
               </p>
               <p>
                 <span className="font-medium text-slate-700">渐进提示：</span>
@@ -452,6 +466,10 @@ function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
   const handleRetestSubmit = () => {
     setRetestSubmitted(true);
   };
+
+  const allMicroSubmitted = diagnosis.microExercises.every(
+    (exercise) => microSubmitted[exercise.id]
+  );
 
   // 构建回溯路径图
   const { nodes: flowNodes, edges: flowEdges } = useMemo(() => {
@@ -626,6 +644,11 @@ function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
           <h3 className="text-base font-bold text-green-700">现在就补</h3>
           <Zap className="w-4 h-4 text-green-500" />
         </div>
+        {diagnosis.recoveryTitle && (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {diagnosis.recoveryTitle}
+          </div>
+        )}
 
         {/* 超短讲解 */}
         <div className="mini-lesson-card mb-5">
@@ -675,7 +698,13 @@ function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
             submitted={retestSubmitted}
             onSelect={handleRetestSelect}
             onSubmit={handleRetestSubmit}
+            disabled={!allMicroSubmitted}
           />
+          {!allMicroSubmitted && (
+            <div className="mt-3 text-xs text-slate-500">
+              先完成上面的 2 道微练习，再进入回测验证。
+            </div>
+          )}
 
           {retestSubmitted && retestAnswer === diagnosis.retestQuestion.correctAnswer && (
             <div className="mt-3 flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200">
@@ -707,6 +736,7 @@ function MicroExerciseCard({
   submitted,
   onSelect,
   onSubmit,
+  disabled = false,
 }: {
   exercise: MicroExercise;
   index: number;
@@ -715,6 +745,7 @@ function MicroExerciseCard({
   submitted: boolean;
   onSelect: (answer: string) => void;
   onSubmit: () => void;
+  disabled?: boolean;
 }) {
   const isCorrect = submitted && selectedAnswer === exercise.correctAnswer;
   const isWrong = submitted && selectedAnswer !== exercise.correctAnswer;
@@ -742,7 +773,7 @@ function MicroExerciseCard({
               <button
                 key={i}
                 onClick={() => onSelect(opt)}
-                disabled={submitted}
+                disabled={submitted || disabled}
                 className={`micro-exercise-option ${
                   optCorrect
                     ? "border-green-400 bg-green-50"
@@ -774,7 +805,7 @@ function MicroExerciseCard({
       )}
 
       {!submitted && selectedAnswer && (
-        <button onClick={onSubmit} className="btn-primary text-xs py-1.5 px-3">
+        <button onClick={onSubmit} disabled={disabled} className="btn-primary text-xs py-1.5 px-3">
           <CheckCircle className="w-3.5 h-3.5" />
           确认
         </button>

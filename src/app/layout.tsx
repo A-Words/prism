@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     default: "Prism - 数学学习导航",
     template: "%s | Prism",
   },
-  description: "AI 驱动的高中数学学习导航系统 —— 解题路径图、学习路径图、个性化诊断回溯",
+  description: "Mock 驱动的高中数学学习导航系统 —— 解题路径图、学习路径图、个性化诊断回溯",
 };
 
 export default function RootLayout({
@@ -20,8 +20,8 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="antialiased">
         <Sidebar />
-        <main className="ml-[240px] min-h-screen transition-all duration-300">
-          <div className="mx-auto max-w-7xl px-6 py-8">
+        <main className="min-h-screen lg:pl-[240px]">
+          <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-8 lg:px-6 lg:py-8">
             {children}
           </div>
         </main>
