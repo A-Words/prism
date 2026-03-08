@@ -10,6 +10,25 @@ export class AIProviderError extends Error {
   }
 }
 
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    const cause = error.cause instanceof Error ? error.cause.message : undefined;
+    return cause && cause !== error.message
+      ? `${error.message}: ${cause}`
+      : error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 export interface StructuredGenerationParams<TSchema extends ZodTypeAny> {
   system: string;
   prompt: string;
@@ -103,7 +122,9 @@ class OpenAICompatibleProvider implements AIProvider {
       if (error instanceof AIProviderError) {
         throw error;
       }
-      throw new AIProviderError("AI generation failed", { cause: error });
+      throw new AIProviderError(`AI generation failed: ${describeError(error)}`, {
+        cause: error,
+      });
     }
   }
 }

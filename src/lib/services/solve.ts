@@ -1,5 +1,5 @@
 import type { ProblemGuide, SolutionPath, SolutionStep } from "@/types";
-import { buildKnowledgeContext } from "@/lib/ai/context";
+import { buildFocusedKnowledgeContext } from "@/lib/ai/context";
 import { getAIProvider } from "@/lib/ai/provider";
 import { solutionPathAiSchema, solutionPathSchema } from "@/lib/ai/schemas";
 import { getKnowledgeNode } from "@/lib/knowledge-graph";
@@ -795,6 +795,13 @@ async function tryGenerateAiSolution(
     throw new Error("AI provider is not configured");
   }
 
+  const focusedKnowledgeContext = buildFocusedKnowledgeContext({
+    knowledgeIds: unique([
+      ...fallback.relatedKnowledge,
+      ...fallback.steps.flatMap((step) => step.knowledgePoints),
+    ]),
+  });
+
   const { object, provider: providerName, model } =
     await provider.generateStructured({
       system: [
@@ -808,7 +815,7 @@ async function tryGenerateAiSolution(
         `规则层识别的题型模板：${template}`,
         "",
         "知识图谱上下文：",
-        buildKnowledgeContext(),
+        focusedKnowledgeContext,
         "",
         "请生成适合学生模式的解题路径，避免直接输出完整标准答案。",
       ].join("\n"),

@@ -4,7 +4,7 @@ import type {
   MicroExercise,
   PracticeQuestion,
 } from "@/types";
-import { buildKnowledgeContext } from "@/lib/ai/context";
+import { buildFocusedKnowledgeContext } from "@/lib/ai/context";
 import { getAIProvider } from "@/lib/ai/provider";
 import {
   diagnosisEnrichmentSchema,
@@ -156,39 +156,59 @@ async function tryEnhanceDiagnosis(
     throw new Error("AI provider is not configured");
   }
 
+  const focusedKnowledgeContext = buildFocusedKnowledgeContext({
+    knowledgeIds: unique([
+      ...question.knowledgePoints,
+      ...baseDiagnosis.backtrackPath,
+      ...baseDiagnosis.prerequisitesToFix.map((item) => item.id),
+      ...(baseDiagnosis.recommendedLearnTargetId
+        ? [baseDiagnosis.recommendedLearnTargetId]
+        : []),
+    ]),
+  });
+
   const { object, provider: providerName, model } =
     await provider.generateStructured({
       system: [
         "你是高中数学错因诊断助手。",
         "你只能补写诊断文案和微练习，不要修改 questionId、错误分类、前置知识、回溯链和推荐学习目标。",
         "输出必须适合学生阅读，避免空泛鼓励。",
+        "聚焦当前题目的关键误区，不要展开无关知识图谱。",
+        "输出必须是纯文本 JSON 字段内容，不要使用 Markdown 代码块。",
+        "不要输出 LaTeX 命令或反斜杠写法；例如用 A∩B、{2}、x^2，禁止 \\cap、\\{、\\sqrt 这类写法。",
       ].join("\n"),
       prompt: [
         `题目：${question.problem}`,
+        question.options?.length
+          ? `选项：${question.options.slice(0, 4).join(" | ")}`
+          : "",
+        question.hints?.length
+          ? `题目提示：${question.hints.slice(0, 2).join("；")}`
+          : "",
         `学生答案：${baseDiagnosis.studentAnswer}`,
         `正确答案：${question.correctAnswer}`,
         `错误分类：${baseDiagnosis.errorCategoryLabel}`,
+        `涉及知识点：${question.knowledgePoints.join(", ")}`,
         "",
         "知识图谱上下文：",
-        buildKnowledgeContext(),
+        focusedKnowledgeContext,
         "",
-        "请基于以下规则骨架补全诊断内容：",
-        JSON.stringify(
-          {
-            questionId: baseDiagnosis.questionId,
-            errorCategory: baseDiagnosis.errorCategory,
-            errorCategoryLabel: baseDiagnosis.errorCategoryLabel,
-            prerequisitesToFix: baseDiagnosis.prerequisitesToFix,
-            backtrackPath: baseDiagnosis.backtrackPath,
-            recommendedLearnTargetId: baseDiagnosis.recommendedLearnTargetId,
-            recommendedLearnQuery: baseDiagnosis.recommendedLearnQuery,
-          },
-          null,
-          2
-        ),
-      ].join("\n"),
+        "写作约束：所有字符串都用自然语言纯文本，不要包含反斜杠或 LaTeX 命令。",
+        "",
+        "规则骨架：",
+        `- questionId: ${baseDiagnosis.questionId}`,
+        `- errorCategory: ${baseDiagnosis.errorCategory}`,
+        `- prerequisitesToFix: ${baseDiagnosis.prerequisitesToFix
+          .map((item) => `${item.id}(${item.name})`)
+          .join(", ")}`,
+        `- backtrackPath: ${baseDiagnosis.backtrackPath.join(" -> ")}`,
+        `- recommendedLearnTargetId: ${baseDiagnosis.recommendedLearnTargetId || ""}`,
+        `- recommendedLearnQuery: ${baseDiagnosis.recommendedLearnQuery || ""}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
       schema: diagnosisEnrichmentSchema,
-      temperature: 0.4,
+      temperature: 0.25,
       timeoutMs: 45_000,
     });
 
