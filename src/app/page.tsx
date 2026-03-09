@@ -23,15 +23,17 @@ import {
 import { getKnowledgeNode, knowledgeNodes } from "@/lib/knowledge-graph";
 import {
   useAppStore,
+  getDiagnosisRecoveryProgress,
   getWeakPoints,
   getLatestDiagnosisRecord,
   getRecentPractice,
   getDailyRecommendation,
 } from "@/lib/store";
-import { getLearnHref, getMockQuestionById, mockQuestions } from "@/lib/mock-data";
+import { getLearnHref, getMockQuestionById } from "@/lib/mock-data";
 import {
   CATEGORY_COLORS,
   CATEGORY_LABELS,
+  DIAGNOSIS_STATUS_LABELS,
   MASTERY_COLORS,
   type KnowledgeCategory,
 } from "@/types";
@@ -39,11 +41,17 @@ import {
 export default function HomePage() {
   const progress = useAppStore((s) => s.progress);
   const getMastery = useAppStore((s) => s.getMastery);
+  const startDiagnosisRecovery = useAppStore((s) => s.startDiagnosisRecovery);
 
   const weakPoints = getWeakPoints(progress);
   const recentPractice = getRecentPractice(progress, 5);
   const latestDiagnosis = getLatestDiagnosisRecord(progress);
   const recommendation = getDailyRecommendation(progress);
+  const canResumeLatestDiagnosis =
+    latestDiagnosis &&
+    (latestDiagnosis.status === "pending_recovery" ||
+      latestDiagnosis.status === "recovering" ||
+      latestDiagnosis.status === "retested_failed");
 
   const totalPracticed = progress.practiceHistory.length;
   const correctCount = progress.practiceHistory.filter((p) => p.isCorrect).length;
@@ -127,27 +135,29 @@ export default function HomePage() {
             <div className="flex items-center gap-2 mb-5">
               <Zap className="w-5 h-5 text-amber-500" />
               <h2 className="text-lg font-bold text-slate-900">今日学习任务</h2>
+              {recommendation.totalEstimatedMinutes > 0 && (
+                <span className="ml-auto text-xs font-medium text-amber-700">
+                  建议投入 {recommendation.totalEstimatedMinutes} 分钟
+                </span>
+              )}
             </div>
 
-            <div className="space-y-3">
-              {/* Continue learning path */}
-              {recommendation.continuePath ? (
-                <Link href={recommendation.continuePath.href} className="task-card flex items-center gap-4 group">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-50 shrink-0">
-                    <RotateCcw className="w-5 h-5 text-indigo-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-800">
-                      继续学习：{recommendation.continuePath.targetName}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      进度 {recommendation.continuePath.currentStep}/{recommendation.continuePath.totalSteps} ·
-                      接着上次继续
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
-                </Link>
-              ) : (
+            {recommendation.tasks.length > 0 ? (
+              <div className="space-y-3">
+                {recommendation.tasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onDiagnosisClick={() => {
+                      if (task.type === "diagnosis_recovery" && task.questionId) {
+                        startDiagnosisRecovery(task.questionId);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
                 <Link href="/learn" className="task-card flex items-center gap-4 group">
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-50 shrink-0">
                     <Play className="w-5 h-5 text-indigo-500" />
@@ -162,51 +172,8 @@ export default function HomePage() {
                   </div>
                   <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
                 </Link>
-              )}
-
-              {/* Recommended knowledge points */}
-              {recommendation.recommendedKnowledge.map((k) => (
-                <Link
-                  key={k.id}
-                  href={k.href}
-                  className="task-card flex items-center gap-4 group"
-                >
-                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-50 shrink-0">
-                    <Brain className="w-5 h-5 text-emerald-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-800">
-                      推荐学习：{k.name}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {k.reason}
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors shrink-0" />
-                </Link>
-              ))}
-
-              {/* Targeted practice */}
-              <Link
-                href="/practice"
-                className="task-card flex items-center gap-4 group"
-              >
-                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-50 shrink-0">
-                  <ClipboardCheck className="w-5 h-5 text-amber-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-slate-800">
-                    针对性练习
-                  </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    {weakPoints.length > 0
-                      ? `建议完成 ${recommendation.practiceCount} 道题，重点巩固薄弱环节`
-                      : "完成一组练习，检测学习效果"}
-                  </div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-amber-500 transition-colors shrink-0" />
-              </Link>
-            </div>
+              </div>
+            )}
           </section>
 
           {/* Section B: 当前薄弱点 */}
@@ -294,6 +261,11 @@ export default function HomePage() {
               <div className="space-y-4">
                 <Link
                   href={latestDiagnosis.href}
+                  onClick={() => {
+                    if (canResumeLatestDiagnosis) {
+                      startDiagnosisRecovery(latestDiagnosis.questionId);
+                    }
+                  }}
                   className="block rounded-2xl border border-blue-200 bg-blue-50/80 p-4 transition-colors hover:border-blue-300"
                 >
                   <div className="flex items-start gap-3">
@@ -306,6 +278,15 @@ export default function HomePage() {
                         错因：{latestDiagnosis.diagnosis.errorCategoryLabel} · 推荐回补：
                         {getKnowledgeNode(latestDiagnosis.diagnosis.recommendedLearnTargetId || "")?.name ||
                           "学习路径"}
+                      </div>
+                      <div className="mt-2 flex items-center gap-2 text-[11px] text-blue-700">
+                        <span className="badge bg-blue-100 text-blue-700">
+                          {DIAGNOSIS_STATUS_LABELS[latestDiagnosis.status]}
+                        </span>
+                        <span>
+                          微练 {getDiagnosisRecoveryProgress(latestDiagnosis).completedMicro}/
+                          {getDiagnosisRecoveryProgress(latestDiagnosis).totalMicro}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -345,7 +326,7 @@ export default function HomePage() {
             ) : recentPractice.length > 0 ? (
               <div className="space-y-2">
                 {recentPractice.map((record) => {
-                  const question = mockQuestions.find((q) => q.id === record.questionId);
+                  const question = getMockQuestionById(record.questionId);
                   return (
                     <div
                       key={`${record.questionId}-${record.timestamp}`}
@@ -481,6 +462,73 @@ export default function HomePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function TaskCard({
+  task,
+  onDiagnosisClick,
+}: {
+  task: ReturnType<typeof getDailyRecommendation>["tasks"][number];
+  onDiagnosisClick?: () => void;
+}) {
+  const config =
+    task.type === "diagnosis_recovery"
+      ? {
+          icon: AlertTriangle,
+          bg: "bg-blue-50",
+          iconColor: "text-blue-500",
+          hoverColor: "group-hover:text-blue-500",
+        }
+      : task.type === "continue_learning"
+      ? {
+          icon: RotateCcw,
+          bg: "bg-indigo-50",
+          iconColor: "text-indigo-500",
+          hoverColor: "group-hover:text-indigo-500",
+        }
+      : task.type === "recommended_learning"
+      ? {
+          icon: Brain,
+          bg: "bg-emerald-50",
+          iconColor: "text-emerald-500",
+          hoverColor: "group-hover:text-emerald-500",
+        }
+      : {
+          icon: ClipboardCheck,
+          bg: "bg-amber-50",
+          iconColor: "text-amber-500",
+          hoverColor: "group-hover:text-amber-500",
+        };
+
+  const Icon = config.icon;
+
+  return (
+    <Link
+      href={task.href}
+      onClick={onDiagnosisClick}
+      className="task-card flex items-center gap-4 group"
+    >
+      <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${config.bg} shrink-0`}>
+        <Icon className={`w-5 h-5 ${config.iconColor}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <div className="text-sm font-semibold text-slate-800">{task.title}</div>
+          {task.statusLabel && (
+            <span className="badge bg-slate-100 text-slate-600 text-[10px]">
+              {task.statusLabel}
+            </span>
+          )}
+        </div>
+        <div className="text-xs text-slate-500 mt-0.5">{task.reason}</div>
+        <div className="text-[11px] text-slate-400 mt-1">
+          {task.detail ? `${task.detail} · ` : ""}
+          预计 {task.estimatedMinutes} 分钟
+        </div>
+      </div>
+      <ArrowRight className={`w-4 h-4 text-slate-300 transition-colors shrink-0 ${config.hoverColor}`} />
+    </Link>
   );
 }
 

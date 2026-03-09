@@ -288,6 +288,7 @@ function LearnPageContent() {
       startedAt: currentSavedPath?.startedAt || now,
       updatedAt: now,
       status: currentSavedPath?.status || "active",
+      activeDiagnosisQuestionId: currentSavedPath?.activeDiagnosisQuestionId,
     });
     setFeedback(`已开始「${targetName}」路径，当前节点：${getKnowledgeNode(currentNode.knowledgeId)?.name}`);
   }, [currentNode, currentNodeIndex, currentSavedPath, plan, upsertLearningPath]);

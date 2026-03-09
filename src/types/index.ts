@@ -289,6 +289,36 @@ export interface DiagnosticResult {
   meta?: ApiResponseMeta;
 }
 
+export type DiagnosisRecordStatus =
+  | "pending_recovery"
+  | "recovering"
+  | "retested_passed"
+  | "retested_failed"
+  | "dismissed";
+
+export interface DiagnosisSubmissionResult {
+  answer: string;
+  isCorrect: boolean;
+  submittedAt: string;
+}
+
+export interface DiagnosisRecord {
+  id: string;
+  questionId: string;
+  createdAt: string;
+  updatedAt: string;
+  status: DiagnosisRecordStatus;
+  diagnosis: DiagnosticResult;
+  recommendedTargetId?: string;
+  recommendedQuery?: string;
+  recoveryLearningPathTargetId?: string;
+  recoveryNodeId?: string;
+  recoveryStartedAt?: string;
+  completedAt?: string;
+  microExerciseResults: Record<string, DiagnosisSubmissionResult>;
+  retestResult?: DiagnosisSubmissionResult;
+}
+
 export const ERROR_CATEGORY_LABELS: Record<ErrorCategory, string> = {
   concept: "概念未掌握",
   formula: "公式选错/记错",
@@ -307,6 +337,14 @@ export const ERROR_CATEGORY_COLORS: Record<ErrorCategory, string> = {
   careless: "#64748b",
 };
 
+export const DIAGNOSIS_STATUS_LABELS: Record<DiagnosisRecordStatus, string> = {
+  pending_recovery: "待回补",
+  recovering: "回补中",
+  retested_passed: "已通过",
+  retested_failed: "待继续回补",
+  dismissed: "已忽略",
+};
+
 export interface LearningPathProgress {
   targetId: string;
   targetName: string;
@@ -317,6 +355,7 @@ export interface LearningPathProgress {
   startedAt: string;
   updatedAt: string;
   status: "active" | "completed";
+  activeDiagnosisQuestionId?: string;
 }
 
 export interface StudentProgress {
@@ -328,6 +367,7 @@ export interface StudentProgress {
     timestamp: string;
   }[];
   learningPaths: LearningPathProgress[];
+  diagnosisRecords: DiagnosisRecord[];
 }
 
 // ---- UI 状态 ----
@@ -339,6 +379,19 @@ export interface AppState {
   addPracticeRecord: (record: StudentProgress["practiceHistory"][0]) => void;
   upsertLearningPath: (path: LearningPathProgress) => void;
   completeLearningPathStep: (targetId: string, completedNodeId: string, nextNodeId?: string) => void;
+  recordDiagnosis: (diagnosis: DiagnosticResult) => DiagnosisRecord;
+  submitDiagnosisMicroExercise: (
+    questionId: string,
+    exerciseId: string,
+    answer: string,
+    isCorrect: boolean
+  ) => void;
+  submitDiagnosisRetest: (
+    questionId: string,
+    answer: string,
+    isCorrect: boolean
+  ) => void;
+  startDiagnosisRecovery: (questionId: string) => string | undefined;
   getMastery: (nodeId: string) => MasteryLevel;
   getMasteryScore: (nodeId: string) => number;
 

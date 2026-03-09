@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   ReactFlow,
@@ -38,7 +38,6 @@ import type { DiagnosticNodeData } from "@/components/graph/diagnostic-node";
 import { MathText } from "@/components/ui/math-renderer";
 import {
   getLearnHref,
-  getMockDiagnosisByQuestionId,
   mockQuestions,
 } from "@/lib/mock-data";
 import { getKnowledgeNode } from "@/lib/knowledge-graph";
@@ -65,13 +64,22 @@ export default function PracticePage() {
   const [diagnosis, setDiagnosis] = useState<DiagnosticResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
+  const [diagnosisError, setDiagnosisError] = useState<string | null>(null);
 
-  const { updateMastery, addPracticeRecord, getMastery } = useAppStore();
+  const {
+    updateMastery,
+    addPracticeRecord,
+    getMastery,
+    recordDiagnosis,
+    startDiagnosisRecovery,
+    setCurrentDiagnosis,
+  } = useAppStore();
 
   const handleSubmit = useCallback(async () => {
     if (!selectedAnswer) return;
     setLoading(true);
     setSubmitted(true);
+    setDiagnosisError(null);
 
     const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
 
@@ -102,16 +110,32 @@ export default function PracticePage() {
         if (res.ok) {
           const data = await res.json();
           setDiagnosis(data);
+          recordDiagnosis(data);
+          setCurrentDiagnosis(data);
         } else {
-          setDiagnosis(getMockDiagnosisByQuestionId(currentQuestion.id, selectedAnswer) || null);
+          const data = await res.json().catch(() => ({}));
+          setDiagnosis(null);
+          setCurrentDiagnosis(null);
+          setDiagnosisError(data.error || "诊断生成失败，请稍后重试。");
         }
       } catch {
-        setDiagnosis(getMockDiagnosisByQuestionId(currentQuestion.id, selectedAnswer) || null);
+        setDiagnosis(null);
+        setCurrentDiagnosis(null);
+        setDiagnosisError("诊断生成失败，请稍后重试。");
       }
+    } else {
+      setCurrentDiagnosis(null);
     }
 
     setLoading(false);
-  }, [selectedAnswer, currentQuestion, updateMastery, addPracticeRecord]);
+  }, [
+    selectedAnswer,
+    currentQuestion,
+    updateMastery,
+    addPracticeRecord,
+    recordDiagnosis,
+    setCurrentDiagnosis,
+  ]);
 
   const handleNext = useCallback(() => {
     const nextIdx = (questionIndex + 1) % mockQuestions.length;
@@ -122,6 +146,7 @@ export default function PracticePage() {
     setShowHints(false);
     setHintLevel(0);
     setDiagnosis(null);
+    setDiagnosisError(null);
   }, [questionIndex]);
 
   const handleReset = useCallback(() => {
@@ -130,6 +155,7 @@ export default function PracticePage() {
     setShowHints(false);
     setHintLevel(0);
     setDiagnosis(null);
+    setDiagnosisError(null);
   }, []);
 
   return (
@@ -293,12 +319,13 @@ export default function PracticePage() {
                       <button
                         onClick={() =>
                           router.push(
-                            diagnosis.recommendedLearnTargetId
-                              ? getLearnHref(
-                                  diagnosis.recommendedLearnTargetId,
-                                  diagnosis.recommendedLearnQuery
-                                )
-                              : "/learn"
+                            startDiagnosisRecovery(diagnosis.questionId) ||
+                              (diagnosis.recommendedLearnTargetId
+                                ? getLearnHref(
+                                    diagnosis.recommendedLearnTargetId,
+                                    diagnosis.recommendedLearnQuery
+                                  )
+                                : "/learn")
                           )
                         }
                         className="btn-secondary text-sm py-2 px-4"
@@ -365,6 +392,18 @@ export default function PracticePage() {
           {/* Diagnosis result */}
           {submitted && diagnosis && (
             <DiagnosisView diagnosis={diagnosis} />
+          )}
+
+          {submitted && !diagnosis && diagnosisError && (
+            <div className="glass-card p-5 border-2 border-amber-200 bg-amber-50/60">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                <h3 className="text-base font-bold text-amber-700">诊断暂时不可用</h3>
+              </div>
+              <p className="text-sm text-amber-700">
+                {diagnosisError}
+              </p>
+            </div>
           )}
 
           {/* Correct answer feedback */}
@@ -442,6 +481,13 @@ export default function PracticePage() {
 
 function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
   const getMastery = useAppStore((s) => s.getMastery);
+  const submitDiagnosisMicroExercise = useAppStore(
+    (s) => s.submitDiagnosisMicroExercise
+  );
+  const submitDiagnosisRetest = useAppStore((s) => s.submitDiagnosisRetest);
+  const persistedRecord = useAppStore((s) =>
+    s.progress.diagnosisRecords.find((item) => item.questionId === diagnosis.questionId)
+  );
 
   // 微练习答题状态
   const [microAnswers, setMicroAnswers] = useState<Record<string, string | null>>({});
@@ -449,12 +495,47 @@ function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
   const [retestAnswer, setRetestAnswer] = useState<string | null>(null);
   const [retestSubmitted, setRetestSubmitted] = useState(false);
 
+  useEffect(() => {
+    if (!persistedRecord) {
+      return;
+    }
+
+    setMicroAnswers(
+      Object.fromEntries(
+        Object.entries(persistedRecord.microExerciseResults).map(([exerciseId, result]) => [
+          exerciseId,
+          result.answer,
+        ])
+      )
+    );
+    setMicroSubmitted(
+      Object.fromEntries(
+        Object.keys(persistedRecord.microExerciseResults).map((exerciseId) => [
+          exerciseId,
+          true,
+        ])
+      )
+    );
+    setRetestAnswer(persistedRecord.retestResult?.answer || null);
+    setRetestSubmitted(Boolean(persistedRecord.retestResult));
+  }, [persistedRecord]);
+
   const handleMicroSelect = (exerciseId: string, answer: string) => {
     if (microSubmitted[exerciseId]) return;
     setMicroAnswers((prev) => ({ ...prev, [exerciseId]: answer }));
   };
 
   const handleMicroSubmit = (exerciseId: string) => {
+    const selected = microAnswers[exerciseId];
+    const exercise = diagnosis.microExercises.find((item) => item.id === exerciseId);
+    if (!selected || !exercise) return;
+
+    submitDiagnosisMicroExercise(
+      diagnosis.questionId,
+      exerciseId,
+      selected,
+      selected === exercise.correctAnswer
+    );
     setMicroSubmitted((prev) => ({ ...prev, [exerciseId]: true }));
   };
 
@@ -464,6 +545,12 @@ function DiagnosisView({ diagnosis }: { diagnosis: DiagnosticResult }) {
   };
 
   const handleRetestSubmit = () => {
+    if (!retestAnswer) return;
+    submitDiagnosisRetest(
+      diagnosis.questionId,
+      retestAnswer,
+      retestAnswer === diagnosis.retestQuestion.correctAnswer
+    );
     setRetestSubmitted(true);
   };
 
