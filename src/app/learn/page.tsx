@@ -16,6 +16,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import {
   BookOpen,
+  CheckCircle2,
   ChevronRight,
   Clock,
   Compass,
@@ -30,6 +31,7 @@ import {
   Target,
   TestTubeDiagonal,
   Undo2,
+  XCircle,
 } from "lucide-react";
 import { KnowledgeGraphNode } from "@/components/graph/knowledge-node";
 import type { KnowledgeNodeData } from "@/components/graph/knowledge-node";
@@ -40,9 +42,14 @@ import type {
   LearningBaseLevel,
   LearningGenerationMode,
   LearningGoalLevel,
+  LearningNodeExecutionState,
+  LearningPathProgress,
   LearningPlan,
+  LearningPlanNode,
+  LearningQuestion,
+  LearningQuestionSubmissionResult,
 } from "@/types";
-import { CATEGORY_COLORS, MASTERY_COLORS, MASTERY_LABELS } from "@/types";
+import { MASTERY_LABELS } from "@/types";
 
 const nodeTypes = { knowledgeNode: KnowledgeGraphNode };
 
@@ -72,6 +79,213 @@ const GENERATION_MODES: { value: LearningGenerationMode; label: string }[] = [
   { value: "assessment", label: "先做起点测试" },
 ];
 
+const NODE_STATE_LABELS: Record<LearningNodeExecutionState, string> = {
+  locked: "未展开",
+  current: "当前节点",
+  learning: "学习中",
+  verifying: "验证中",
+  passed: "已通过",
+  failed: "待回退",
+  backtracking: "回补中",
+  skipped: "已跳过",
+};
+
+function findSavedPath(
+  learningPaths: LearningPathProgress[],
+  targetId?: string | null
+) {
+  if (!targetId) {
+    return undefined;
+  }
+
+  return [...learningPaths].reverse().find((item) => item.targetId === targetId);
+}
+
+function getRecommendedStartId(
+  plan: LearningPlan,
+  savedPath?: LearningPathProgress
+) {
+  return (
+    savedPath?.session?.assessment?.recommendedStartId ||
+    plan.recommendedStartId ||
+    plan.nodes[0]?.knowledgeId
+  );
+}
+
+function createNodeStates(params: {
+  plan: LearningPlan;
+  currentNodeId: string;
+  completedNodeIds: string[];
+  recommendedStartId?: string;
+  existingStates?: Record<string, LearningNodeExecutionState>;
+  activeNodeMode?: "learning" | "verifying";
+}) {
+  const {
+    plan,
+    currentNodeId,
+    completedNodeIds,
+    recommendedStartId,
+    existingStates,
+    activeNodeMode,
+  } = params;
+  const completedSet = new Set(completedNodeIds);
+  const recommendedStartIndex = Math.max(
+    0,
+    plan.nodes.findIndex((node) => node.knowledgeId === recommendedStartId)
+  );
+
+  return Object.fromEntries(
+    plan.nodes.map((node, index) => {
+      let nextState: LearningNodeExecutionState;
+      if (completedSet.has(node.knowledgeId)) {
+        nextState = index < recommendedStartIndex ? "skipped" : "passed";
+      } else if (node.knowledgeId === currentNodeId) {
+        nextState =
+          activeNodeMode === "learning"
+            ? "learning"
+            : activeNodeMode === "verifying"
+            ? "verifying"
+            : existingStates?.[node.knowledgeId] === "backtracking"
+            ? "backtracking"
+            : "current";
+      } else if (existingStates?.[node.knowledgeId] === "failed") {
+        nextState = "failed";
+      } else {
+        nextState = "locked";
+      }
+
+      return [node.knowledgeId, nextState];
+    })
+  ) as Record<string, LearningNodeExecutionState>;
+}
+
+function getVisibleNodeIds(plan: LearningPlan, savedPath?: LearningPathProgress) {
+  const recommendedStartId = getRecommendedStartId(plan, savedPath);
+  const startIndex = Math.max(
+    0,
+    plan.nodes.findIndex((node) => node.knowledgeId === recommendedStartId)
+  );
+  const visible = new Set(
+    plan.nodes.slice(startIndex).map((node) => node.knowledgeId)
+  );
+
+  savedPath?.completedNodeIds.forEach((nodeId) => visible.add(nodeId));
+  savedPath?.session?.revealedRemedialNodeIds.forEach((nodeId) => visible.add(nodeId));
+  if (savedPath?.currentNodeId) {
+    visible.add(savedPath.currentNodeId);
+  }
+
+  return visible;
+}
+
+function walkBacktrackNode(plan: LearningPlan, nodeId: string, depth: number) {
+  let current = plan.nodes.find((node) => node.knowledgeId === nodeId);
+  let nextId = current?.backtrackTo;
+  let remaining = depth;
+
+  while (current && nextId && remaining > 1) {
+    current = plan.nodes.find((node) => node.knowledgeId === nextId);
+    nextId = current?.backtrackTo;
+    remaining -= 1;
+  }
+
+  return nextId || nodeId;
+}
+
+function getRemedialNodeIds(
+  plan: LearningPlan,
+  fromNodeId: string,
+  toNodeId: string
+) {
+  const fromIndex = plan.nodes.findIndex((node) => node.knowledgeId === fromNodeId);
+  const toIndex = plan.nodes.findIndex((node) => node.knowledgeId === toNodeId);
+  if (fromIndex < 0 || toIndex < 0) {
+    return [toNodeId];
+  }
+
+  const [start, end] =
+    fromIndex < toIndex ? [fromIndex, toIndex] : [toIndex, fromIndex];
+  return plan.nodes.slice(start, end + 1).map((node) => node.knowledgeId);
+}
+
+function buildLearningPathRecord(params: {
+  plan: LearningPlan;
+  existingPath?: LearningPathProgress;
+  currentNodeId: string;
+  completedNodeIds: string[];
+  recommendedStartId?: string;
+  targetName: string;
+  sessionOverrides?: Partial<NonNullable<LearningPathProgress["session"]>>;
+  status?: LearningPathProgress["status"];
+}) {
+  const {
+    plan,
+    existingPath,
+    currentNodeId,
+    completedNodeIds,
+    recommendedStartId,
+    targetName,
+    sessionOverrides,
+    status,
+  } = params;
+  const now = new Date().toISOString();
+  const nextSession = {
+    assessment:
+      sessionOverrides?.assessment !== undefined
+        ? sessionOverrides.assessment
+        : existingPath?.session?.assessment,
+    nodeStates:
+      sessionOverrides?.nodeStates ||
+      createNodeStates({
+        plan,
+        currentNodeId,
+        completedNodeIds,
+        recommendedStartId,
+        existingStates: existingPath?.session?.nodeStates,
+        activeNodeMode: sessionOverrides?.activeNodeMode,
+      }),
+    verificationResults: {
+      ...(existingPath?.session?.verificationResults || {}),
+      ...(sessionOverrides?.verificationResults || {}),
+    },
+    failureCounts: {
+      ...(existingPath?.session?.failureCounts || {}),
+      ...(sessionOverrides?.failureCounts || {}),
+    },
+    revealedRemedialNodeIds: Array.from(
+      new Set([
+        ...(existingPath?.session?.revealedRemedialNodeIds || []),
+        ...(sessionOverrides?.revealedRemedialNodeIds || []),
+      ])
+    ),
+    repairedNodeIds: Array.from(
+      new Set([
+        ...(existingPath?.session?.repairedNodeIds || []),
+        ...(sessionOverrides?.repairedNodeIds || []),
+      ])
+    ),
+    activeNodeMode: sessionOverrides?.activeNodeMode,
+  };
+
+  return {
+    targetId: plan.targetKnowledgeId || existingPath?.targetId || "",
+    targetName: existingPath?.targetName || targetName,
+    currentNodeId,
+    currentStep: Math.max(
+      1,
+      plan.nodes.findIndex((node) => node.knowledgeId === currentNodeId) + 1
+    ),
+    totalSteps: plan.nodes.length,
+    completedNodeIds,
+    startedAt: existingPath?.startedAt || now,
+    updatedAt: now,
+    status: status || existingPath?.status || "active",
+    activeDiagnosisQuestionId: existingPath?.activeDiagnosisQuestionId,
+    activeSolveProblemKey: existingPath?.activeSolveProblemKey,
+    session: nextSession,
+  } satisfies LearningPathProgress;
+}
+
 export default function LearnPage() {
   return (
     <Suspense fallback={<LoadingState generationMode="quick" />}>
@@ -87,10 +301,8 @@ function LearnPageContent() {
 
   const progress = useAppStore((state) => state.progress);
   const getMastery = useAppStore((state) => state.getMastery);
+  const updateMastery = useAppStore((state) => state.updateMastery);
   const upsertLearningPath = useAppStore((state) => state.upsertLearningPath);
-  const completeLearningPathStep = useAppStore(
-    (state) => state.completeLearningPathStep
-  );
 
   const [query, setQuery] = useState("");
   const [baseLevel, setBaseLevel] = useState<LearningBaseLevel>("basic");
@@ -104,34 +316,37 @@ function LearnPageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [draftVerificationAnswer, setDraftVerificationAnswer] = useState("");
 
-  const currentSavedPath = useMemo(() => {
-    if (!plan?.targetKnowledgeId) {
-      return undefined;
-    }
-    return [...progress.learningPaths]
-      .reverse()
-      .find((item) => item.targetId === plan.targetKnowledgeId);
-  }, [plan?.targetKnowledgeId, progress.learningPaths]);
+  const currentSavedPath = useMemo(
+    () => findSavedPath(progress.learningPaths, plan?.targetKnowledgeId),
+    [plan?.targetKnowledgeId, progress.learningPaths]
+  );
 
   const loadPlan = useCallback(
     async ({
       queryText,
       targetId,
       syncUrl = true,
+      assessmentResults,
     }: {
       queryText?: string;
       targetId?: string;
       syncUrl?: boolean;
+      assessmentResults?: Array<
+        Pick<
+          LearningQuestionSubmissionResult,
+          "questionId" | "knowledgeId" | "answer" | "isCorrect"
+        >
+      >;
     }) => {
       const trimmedQuery = queryText?.trim();
       if (!trimmedQuery && !targetId) {
-        return;
+        return null;
       }
 
       setLoading(true);
       setError(null);
-      setFeedback(null);
 
       try {
         const response = await fetch("/api/learn-path", {
@@ -143,6 +358,7 @@ function LearnPageContent() {
             baseLevel,
             goalLevel,
             generationMode,
+            assessmentResults,
           }),
         });
 
@@ -153,8 +369,9 @@ function LearnPageContent() {
 
         const data: LearningPlan = await response.json();
         const resolvedQuery = trimmedQuery || searchParams.get("query") || data.goal;
+        const restoredPath = findSavedPath(progress.learningPaths, data.targetKnowledgeId);
         const restoredNodeId =
-          currentSavedPath?.currentNodeId ||
+          restoredPath?.currentNodeId ||
           data.currentNodeId ||
           data.recommendedStartId ||
           data.nodes[0]?.knowledgeId ||
@@ -164,6 +381,7 @@ function LearnPageContent() {
         setPlan(data);
         setActiveNodeId(restoredNodeId);
         setActivePhase(null);
+        setDraftVerificationAnswer("");
 
         if (syncUrl && data.targetKnowledgeId) {
           const params = new URLSearchParams();
@@ -171,21 +389,17 @@ function LearnPageContent() {
           params.set("query", resolvedQuery);
           router.replace(`/learn?${params.toString()}`, { scroll: false });
         }
+
+        return data;
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "发生错误，请重试");
         setPlan(null);
+        return null;
       } finally {
         setLoading(false);
       }
     },
-    [
-      baseLevel,
-      currentSavedPath?.currentNodeId,
-      generationMode,
-      goalLevel,
-      router,
-      searchParams,
-    ]
+    [baseLevel, generationMode, goalLevel, progress.learningPaths, router, searchParams]
   );
 
   useEffect(() => {
@@ -210,6 +424,42 @@ function LearnPageContent() {
   }, [loadPlan, searchParams]);
 
   useEffect(() => {
+    if (!plan || !plan.targetKnowledgeId) {
+      return;
+    }
+
+    const existingPath = findSavedPath(progress.learningPaths, plan.targetKnowledgeId);
+    if (
+      generationMode === "assessment" &&
+      plan.assessmentQuestions?.length &&
+      !existingPath?.session?.assessment
+    ) {
+      const targetName =
+        getKnowledgeNode(plan.targetKnowledgeId)?.name || plan.goal;
+      upsertLearningPath(
+        buildLearningPathRecord({
+          plan,
+          existingPath,
+          currentNodeId:
+            plan.currentNodeId || plan.recommendedStartId || plan.nodes[0].knowledgeId,
+          completedNodeIds: [],
+          recommendedStartId: plan.recommendedStartId,
+          targetName,
+          sessionOverrides: {
+            assessment: {
+              status: "in_progress",
+              currentIndex: 0,
+              answers: {},
+              results: [],
+            },
+            activeNodeMode: undefined,
+          },
+        })
+      );
+    }
+  }, [generationMode, plan, progress.learningPaths, upsertLearningPath]);
+
+  useEffect(() => {
     if (!plan) {
       return;
     }
@@ -222,36 +472,53 @@ function LearnPageContent() {
     setActiveNodeId((current) => current || fallbackNodeId);
   }, [currentSavedPath?.currentNodeId, plan]);
 
-  const visibleNodes = useMemo(() => {
-    if (!plan) {
-      return [];
-    }
-    return activePhase === null
-      ? plan.nodes
-      : plan.nodes.filter((node) => node.phase === activePhase);
-  }, [activePhase, plan]);
+  const visibleNodeIds = useMemo(
+    () => (plan ? getVisibleNodeIds(plan, currentSavedPath) : new Set<string>()),
+    [currentSavedPath, plan]
+  );
+
+  const currentNodeId =
+    currentSavedPath?.currentNodeId ||
+    plan?.currentNodeId ||
+    plan?.recommendedStartId ||
+    plan?.nodes[0]?.knowledgeId ||
+    null;
 
   const currentNode = useMemo(() => {
+    if (!plan || !currentNodeId) {
+      return null;
+    }
+    return (
+      plan.nodes.find((node) => node.knowledgeId === currentNodeId) ||
+      plan.nodes[0] ||
+      null
+    );
+  }, [currentNodeId, plan]);
+
+  const selectedNode = useMemo(() => {
     if (!plan) {
       return null;
     }
     return (
       plan.nodes.find((node) => node.knowledgeId === activeNodeId) ||
-      plan.nodes.find((node) => node.knowledgeId === plan.currentNodeId) ||
+      currentNode ||
       plan.nodes[0] ||
       null
     );
-  }, [activeNodeId, plan]);
+  }, [activeNodeId, currentNode, plan]);
 
-  const currentNodeIndex = useMemo(() => {
-    if (!plan || !currentNode) {
-      return -1;
-    }
-    return plan.nodes.findIndex((node) => node.knowledgeId === currentNode.knowledgeId);
-  }, [currentNode, plan]);
+  const isAssessmentPending =
+    generationMode === "assessment" &&
+    Boolean(plan?.assessmentQuestions?.length) &&
+    currentSavedPath?.session?.assessment?.status !== "completed";
+
+  const assessmentState = currentSavedPath?.session?.assessment;
+  const assessmentQuestion =
+    plan?.assessmentQuestions?.[assessmentState?.currentIndex || 0] || null;
 
   const handleSubmit = useCallback(
     async (overrideQuery?: string) => {
+      setFeedback(null);
       await loadPlan({
         queryText: overrideQuery || query,
         targetId: searchParams.get("target") || undefined,
@@ -266,54 +533,418 @@ function LearnPageContent() {
     setError(null);
     setFeedback(null);
     setActiveNodeId(null);
+    setDraftVerificationAnswer("");
     lastBootstrapKey.current = null;
     router.replace("/learn", { scroll: false });
   }, [router]);
+
+  const handleAssessmentAnswerChange = useCallback(
+    (question: LearningQuestion, answer: string) => {
+      if (!plan?.targetKnowledgeId || !currentSavedPath) {
+        return;
+      }
+
+      upsertLearningPath(
+        buildLearningPathRecord({
+          plan,
+          existingPath: currentSavedPath,
+          currentNodeId:
+            currentSavedPath.currentNodeId ||
+            plan.currentNodeId ||
+            plan.nodes[0].knowledgeId,
+          completedNodeIds: currentSavedPath.completedNodeIds,
+          recommendedStartId: getRecommendedStartId(plan, currentSavedPath),
+          targetName: currentSavedPath.targetName,
+          sessionOverrides: {
+            assessment: {
+              status: currentSavedPath.session?.assessment?.status || "in_progress",
+              currentIndex: currentSavedPath.session?.assessment?.currentIndex || 0,
+              answers: {
+                ...(currentSavedPath.session?.assessment?.answers || {}),
+                [question.id]: answer,
+              },
+              results: currentSavedPath.session?.assessment?.results || [],
+            },
+            activeNodeMode: currentSavedPath.session?.activeNodeMode,
+          },
+        })
+      );
+    },
+    [currentSavedPath, plan, upsertLearningPath]
+  );
+
+  const handleAssessmentSubmit = useCallback(async () => {
+    if (!plan || !plan.targetKnowledgeId || !assessmentQuestion || !currentSavedPath) {
+      return;
+    }
+
+    const answer =
+      currentSavedPath.session?.assessment?.answers?.[assessmentQuestion.id];
+    if (!answer) {
+      setFeedback("请先选择一个答案，再提交当前起点测试题。");
+      return;
+    }
+
+    const result: LearningQuestionSubmissionResult = {
+      questionId: assessmentQuestion.id,
+      knowledgeId: assessmentQuestion.knowledgeId,
+      answer,
+      isCorrect: answer === assessmentQuestion.correctAnswer,
+      submittedAt: new Date().toISOString(),
+    };
+    const existingResults =
+      currentSavedPath.session?.assessment?.results.filter(
+        (item) => item.questionId !== assessmentQuestion.id
+      ) || [];
+    const nextResults = [...existingResults, result];
+    const nextIndex = (assessmentState?.currentIndex || 0) + 1;
+    const nextStatus =
+      nextIndex >= (plan.assessmentQuestions?.length || 0) ? "completed" : "in_progress";
+
+    upsertLearningPath(
+      buildLearningPathRecord({
+        plan,
+        existingPath: currentSavedPath,
+        currentNodeId:
+          currentSavedPath.currentNodeId ||
+          plan.currentNodeId ||
+          plan.nodes[0].knowledgeId,
+        completedNodeIds: currentSavedPath.completedNodeIds,
+        recommendedStartId: getRecommendedStartId(plan, currentSavedPath),
+        targetName: currentSavedPath.targetName,
+        sessionOverrides: {
+          assessment: {
+            status: nextStatus,
+            currentIndex: Math.min(nextIndex, (plan.assessmentQuestions?.length || 1) - 1),
+            answers: currentSavedPath.session?.assessment?.answers || {},
+            results: nextResults,
+            completedAt:
+              nextStatus === "completed" ? new Date().toISOString() : undefined,
+          },
+          activeNodeMode: undefined,
+        },
+      })
+    );
+
+    if (nextStatus !== "completed") {
+      setFeedback(result.isCorrect ? "当前测试题通过。" : "当前测试题未通过，继续完成后系统会重算起点。");
+      return;
+    }
+
+    const nextPlan = await loadPlan({
+      queryText: query,
+      targetId: plan.targetKnowledgeId,
+      syncUrl: true,
+      assessmentResults: nextResults.map((item) => ({
+        questionId: item.questionId,
+        knowledgeId: item.knowledgeId,
+        answer: item.answer,
+        isCorrect: item.isCorrect,
+      })),
+    });
+    if (!nextPlan) {
+      return;
+    }
+
+    const targetName =
+      getKnowledgeNode(nextPlan.targetKnowledgeId || "")?.name || nextPlan.goal;
+    const recommendedStartId =
+      nextPlan.recommendedStartId || nextPlan.nodes[0]?.knowledgeId;
+    const startIndex = Math.max(
+      0,
+      nextPlan.nodes.findIndex((node) => node.knowledgeId === recommendedStartId)
+    );
+    const completedNodeIds = nextPlan.nodes
+      .slice(0, startIndex)
+      .map((node) => node.knowledgeId);
+    const nextCurrentNodeId =
+      nextPlan.currentNodeId || recommendedStartId || nextPlan.nodes[0].knowledgeId;
+
+    upsertLearningPath(
+      buildLearningPathRecord({
+        plan: nextPlan,
+        existingPath: findSavedPath(progress.learningPaths, nextPlan.targetKnowledgeId),
+        currentNodeId: nextCurrentNodeId,
+        completedNodeIds,
+        recommendedStartId,
+        targetName,
+        sessionOverrides: {
+          assessment: {
+            status: "completed",
+            currentIndex: nextPlan.assessmentQuestions?.length || 3,
+            answers: currentSavedPath.session?.assessment?.answers || {},
+            results: nextResults,
+            recommendedStartId,
+            summary: nextPlan.assessmentSummary,
+            completedAt: new Date().toISOString(),
+          },
+          nodeStates: createNodeStates({
+            plan: nextPlan,
+            currentNodeId: nextCurrentNodeId,
+            completedNodeIds,
+            recommendedStartId,
+          }),
+          activeNodeMode: undefined,
+        },
+      })
+    );
+
+    setActiveNodeId(nextCurrentNodeId);
+    setFeedback(nextPlan.assessmentSummary || "起点测试完成，已定位新的推荐起点。");
+  }, [
+    assessmentQuestion,
+    assessmentState?.currentIndex,
+    currentSavedPath,
+    loadPlan,
+    plan,
+    progress.learningPaths,
+    query,
+    upsertLearningPath,
+  ]);
 
   const handleStartLearning = useCallback(() => {
     if (!plan || !currentNode || !plan.targetKnowledgeId) {
       return;
     }
+
     const targetName =
       getKnowledgeNode(plan.targetKnowledgeId)?.name || plan.goal;
-    const now = new Date().toISOString();
+    const recommendedStartId = getRecommendedStartId(plan, currentSavedPath);
+    const existingPath = currentSavedPath;
+    const completedNodeIds =
+      existingPath?.completedNodeIds.length
+        ? existingPath.completedNodeIds
+        : plan.nodes
+            .slice(
+              0,
+              Math.max(
+                0,
+                plan.nodes.findIndex((node) => node.knowledgeId === recommendedStartId)
+              )
+            )
+            .map((node) => node.knowledgeId);
 
-    upsertLearningPath({
-      targetId: plan.targetKnowledgeId,
-      targetName,
-      currentNodeId: currentNode.knowledgeId,
-      currentStep: Math.max(1, currentNodeIndex + 1),
-      totalSteps: plan.nodes.length,
-      completedNodeIds: currentSavedPath?.completedNodeIds || [],
-      startedAt: currentSavedPath?.startedAt || now,
-      updatedAt: now,
-      status: currentSavedPath?.status || "active",
-      activeDiagnosisQuestionId: currentSavedPath?.activeDiagnosisQuestionId,
-    });
-    setFeedback(`已开始「${targetName}」路径，当前节点：${getKnowledgeNode(currentNode.knowledgeId)?.name}`);
-  }, [currentNode, currentNodeIndex, currentSavedPath, plan, upsertLearningPath]);
+    upsertLearningPath(
+      buildLearningPathRecord({
+        plan,
+        existingPath,
+        currentNodeId: currentNode.knowledgeId,
+        completedNodeIds,
+        recommendedStartId,
+        targetName,
+        sessionOverrides: {
+          nodeStates: createNodeStates({
+            plan,
+            currentNodeId: currentNode.knowledgeId,
+            completedNodeIds,
+            recommendedStartId,
+            existingStates: existingPath?.session?.nodeStates,
+            activeNodeMode: "learning",
+          }),
+          activeNodeMode: "learning",
+        },
+      })
+    );
+    setFeedback(`已进入「${getKnowledgeNode(currentNode.knowledgeId)?.name || currentNode.knowledgeId}」学习态。`);
+  }, [currentNode, currentSavedPath, plan, upsertLearningPath]);
 
-  const advanceNode = useCallback(
-    (modeLabel: string) => {
-      if (!plan || !currentNode || !plan.targetKnowledgeId) {
-        return;
-      }
+  const handleEnterVerification = useCallback(() => {
+    if (!plan || !currentNode || !currentSavedPath) {
+      return;
+    }
 
-      const nextNode = plan.nodes[currentNodeIndex + 1];
-      completeLearningPathStep(
-        plan.targetKnowledgeId,
-        currentNode.knowledgeId,
-        nextNode?.knowledgeId
+    upsertLearningPath(
+      buildLearningPathRecord({
+        plan,
+        existingPath: currentSavedPath,
+        currentNodeId: currentNode.knowledgeId,
+        completedNodeIds: currentSavedPath.completedNodeIds,
+        recommendedStartId: getRecommendedStartId(plan, currentSavedPath),
+        targetName: currentSavedPath.targetName,
+        sessionOverrides: {
+          nodeStates: createNodeStates({
+            plan,
+            currentNodeId: currentNode.knowledgeId,
+            completedNodeIds: currentSavedPath.completedNodeIds,
+            recommendedStartId: getRecommendedStartId(plan, currentSavedPath),
+            existingStates: currentSavedPath.session?.nodeStates,
+            activeNodeMode: "verifying",
+          }),
+          activeNodeMode: "verifying",
+        },
+      })
+    );
+    setDraftVerificationAnswer("");
+    setFeedback("已进入节点验证。");
+  }, [currentNode, currentSavedPath, plan, upsertLearningPath]);
+
+  const handleVerificationSubmit = useCallback(() => {
+    if (
+      !plan ||
+      !currentNode ||
+      !currentSavedPath ||
+      !currentNode.verificationQuestion ||
+      !draftVerificationAnswer
+    ) {
+      setFeedback("请先选择验证题答案。");
+      return;
+    }
+
+    const question = currentNode.verificationQuestion;
+    const isCorrect = draftVerificationAnswer === question.correctAnswer;
+    const result: LearningQuestionSubmissionResult = {
+      questionId: question.id,
+      knowledgeId: question.knowledgeId,
+      answer: draftVerificationAnswer,
+      isCorrect,
+      submittedAt: new Date().toISOString(),
+    };
+    const recommendedStartId = getRecommendedStartId(plan, currentSavedPath);
+    const currentIndex = Math.max(
+      0,
+      plan.nodes.findIndex((node) => node.knowledgeId === currentNode.knowledgeId)
+    );
+
+    if (isCorrect) {
+      updateMastery(currentNode.knowledgeId, true);
+      const nextNode = plan.nodes[currentIndex + 1];
+      const completedNodeIds = Array.from(
+        new Set([...currentSavedPath.completedNodeIds, currentNode.knowledgeId])
       );
-      setActiveNodeId(nextNode?.knowledgeId || currentNode.knowledgeId);
+      const nextNodeId = nextNode?.knowledgeId || currentNode.knowledgeId;
+      upsertLearningPath(
+        buildLearningPathRecord({
+          plan,
+          existingPath: currentSavedPath,
+          currentNodeId: nextNodeId,
+          completedNodeIds,
+          recommendedStartId,
+          targetName: currentSavedPath.targetName,
+          status: nextNode ? "active" : "completed",
+          sessionOverrides: {
+            verificationResults: {
+              [question.id]: result,
+            },
+            nodeStates: createNodeStates({
+              plan,
+              currentNodeId: nextNodeId,
+              completedNodeIds,
+              recommendedStartId,
+              existingStates: {
+                ...(currentSavedPath.session?.nodeStates || {}),
+                [currentNode.knowledgeId]: "passed",
+              },
+            }),
+            repairedNodeIds: [currentNode.knowledgeId],
+            activeNodeMode: undefined,
+          },
+        })
+      );
+      setActiveNodeId(nextNodeId);
+      setDraftVerificationAnswer("");
       setFeedback(
         nextNode
-          ? `${modeLabel}已记录，下一步建议学习「${getKnowledgeNode(nextNode.knowledgeId)?.name}」`
-          : `已完成整条路径，可以回到首页继续今日任务。`
+          ? `验证通过，已推进到「${getKnowledgeNode(nextNodeId)?.name || nextNodeId}」。`
+          : "整条学习路径已完成。"
       );
-    },
-    [completeLearningPathStep, currentNode, currentNodeIndex, plan]
-  );
+      return;
+    }
+
+    updateMastery(currentNode.knowledgeId, false);
+    const previousFailures =
+      currentSavedPath.session?.failureCounts?.[currentNode.knowledgeId] || 0;
+    const nextFailureCount = previousFailures + 1;
+    const backtrackDepth = nextFailureCount >= 2 ? 2 : 1;
+    const backtrackNodeId = walkBacktrackNode(
+      plan,
+      currentNode.knowledgeId,
+      backtrackDepth
+    );
+    const revealedRemedialNodeIds = getRemedialNodeIds(
+      plan,
+      currentNode.knowledgeId,
+      backtrackNodeId
+    );
+
+    upsertLearningPath(
+      buildLearningPathRecord({
+        plan,
+        existingPath: currentSavedPath,
+        currentNodeId: backtrackNodeId,
+        completedNodeIds: currentSavedPath.completedNodeIds,
+        recommendedStartId,
+        targetName: currentSavedPath.targetName,
+        sessionOverrides: {
+          verificationResults: {
+            [question.id]: result,
+          },
+          failureCounts: {
+            [currentNode.knowledgeId]: nextFailureCount,
+          },
+          nodeStates: createNodeStates({
+            plan,
+            currentNodeId: backtrackNodeId,
+            completedNodeIds: currentSavedPath.completedNodeIds,
+            recommendedStartId,
+            existingStates: {
+              ...(currentSavedPath.session?.nodeStates || {}),
+              [currentNode.knowledgeId]: "failed",
+              [backtrackNodeId]: "backtracking",
+            },
+          }),
+          revealedRemedialNodeIds,
+          activeNodeMode: undefined,
+        },
+      })
+    );
+    setActiveNodeId(backtrackNodeId);
+    setDraftVerificationAnswer("");
+    setFeedback(
+      `验证未通过，已按回退规则切回「${getKnowledgeNode(backtrackNodeId)?.name || backtrackNodeId}」。`
+    );
+  }, [currentNode, currentSavedPath, draftVerificationAnswer, plan, updateMastery, upsertLearningPath]);
+
+  const handleBacktrackReveal = useCallback(() => {
+    if (!plan || !currentNode || !currentSavedPath || !currentNode.backtrackTo) {
+      return;
+    }
+
+    const remedialNodeIds = getRemedialNodeIds(
+      plan,
+      currentNode.knowledgeId,
+      currentNode.backtrackTo
+    );
+    upsertLearningPath(
+      buildLearningPathRecord({
+        plan,
+        existingPath: currentSavedPath,
+        currentNodeId: currentNode.backtrackTo,
+        completedNodeIds: currentSavedPath.completedNodeIds,
+        recommendedStartId: getRecommendedStartId(plan, currentSavedPath),
+        targetName: currentSavedPath.targetName,
+        sessionOverrides: {
+          revealedRemedialNodeIds: remedialNodeIds,
+          nodeStates: createNodeStates({
+            plan,
+            currentNodeId: currentNode.backtrackTo,
+            completedNodeIds: currentSavedPath.completedNodeIds,
+            recommendedStartId: getRecommendedStartId(plan, currentSavedPath),
+            existingStates: {
+              ...(currentSavedPath.session?.nodeStates || {}),
+              [currentNode.backtrackTo]: "backtracking",
+            },
+          }),
+          activeNodeMode: undefined,
+        },
+      })
+    );
+    setActiveNodeId(currentNode.backtrackTo);
+    setFeedback(`已展开回补分支，切回「${getKnowledgeNode(currentNode.backtrackTo)?.name || currentNode.backtrackTo}」。`);
+  }, [currentNode, currentSavedPath, plan, upsertLearningPath]);
+
+  const handleLater = useCallback(() => {
+    setFeedback("已标记稍后再学，首页会继续保留这条路径。");
+  }, []);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -324,7 +955,7 @@ function LearnPageContent() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">学习规划器</h1>
           <p className="text-sm text-slate-500">
-            输入学习目标后，系统会生成路径、推荐起点和当前节点执行区。
+            支持快速生成，也支持先做 3 题起点测试后再进入主干学习与节点验证。
           </p>
         </div>
       </div>
@@ -379,9 +1010,7 @@ function LearnPageContent() {
           <SelectField
             label="生成方式"
             value={generationMode}
-            onChange={(value) =>
-              setGenerationMode(value as LearningGenerationMode)
-            }
+            onChange={(value) => setGenerationMode(value as LearningGenerationMode)}
             options={GENERATION_MODES}
           />
         </div>
@@ -422,28 +1051,41 @@ function LearnPageContent() {
       )}
 
       {loading && <LoadingState generationMode={generationMode} />}
-      {plan && currentNode && (
+
+      {plan && isAssessmentPending && assessmentQuestion && currentSavedPath && (
+        <AssessmentView
+          plan={plan}
+          assessmentState={assessmentState}
+          question={assessmentQuestion}
+          selectedAnswer={
+            currentSavedPath.session?.assessment?.answers?.[assessmentQuestion.id] || ""
+          }
+          onSelectAnswer={(answer) =>
+            handleAssessmentAnswerChange(assessmentQuestion, answer)
+          }
+          onSubmit={handleAssessmentSubmit}
+        />
+      )}
+
+      {plan && currentNode && !isAssessmentPending && selectedNode && (
         <PlanView
           plan={plan}
+          savedPath={currentSavedPath}
+          visibleNodeIds={visibleNodeIds}
           activePhase={activePhase}
           setActivePhase={setActivePhase}
           activeNodeId={activeNodeId}
           setActiveNodeId={setActiveNodeId}
-          currentNodeId={currentNode.knowledgeId}
+          currentNode={currentNode}
+          selectedNode={selectedNode}
           getMastery={getMastery}
+          draftVerificationAnswer={draftVerificationAnswer}
+          setDraftVerificationAnswer={setDraftVerificationAnswer}
           onStartLearning={handleStartLearning}
-          onSelfCheck={() => advanceNode("自测通过")}
-          onBacktrack={() => {
-            if (currentNode.backtrackTo) {
-              setActiveNodeId(currentNode.backtrackTo);
-              setFeedback(
-                `已切回前置节点「${getKnowledgeNode(currentNode.backtrackTo)?.name}」`
-              );
-            }
-          }}
-          onLater={() => {
-            setFeedback("已标记为稍后再学，首页会继续保留这条任务。");
-          }}
+          onEnterVerification={handleEnterVerification}
+          onSubmitVerification={handleVerificationSubmit}
+          onBacktrackReveal={handleBacktrackReveal}
+          onLater={handleLater}
         />
       )}
     </div>
@@ -493,42 +1135,162 @@ function LoadingState({
         <Sparkles className="absolute -right-1 -top-1 h-5 w-5 animate-pulse text-amber-400" />
       </div>
       <h3 className="mb-2 text-lg font-semibold text-slate-700">
-        {generationMode === "assessment" ? "正在准备起点测试建议…" : "正在生成学习路径…"}
+        {generationMode === "assessment" ? "正在准备起点测试…" : "正在生成学习路径…"}
       </h3>
       <p className="text-sm text-slate-400">
-        匹配场景、装载路径摘要、定位当前推荐节点
+        匹配学习场景、生成评估题和节点验证、定位推荐起点
       </p>
+    </div>
+  );
+}
+
+function AssessmentView({
+  plan,
+  assessmentState,
+  question,
+  selectedAnswer,
+  onSelectAnswer,
+  onSubmit,
+}: {
+  plan: LearningPlan;
+  assessmentState?: NonNullable<LearningPathProgress["session"]>["assessment"];
+  question: LearningQuestion;
+  selectedAnswer: string;
+  onSelectAnswer: (answer: string) => void;
+  onSubmit: () => void;
+}) {
+  const currentIndex = assessmentState?.currentIndex || 0;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="glass-card p-5 border-l-4 border-indigo-400">
+          <div className="flex items-start gap-3">
+            <TestTubeDiagonal className="mt-0.5 h-5 w-5 shrink-0 text-indigo-500" />
+            <div className="space-y-2">
+              <h3 className="font-bold text-slate-900">3 题起点测试</h3>
+              <p className="text-sm leading-relaxed text-slate-600">
+                完成后系统会根据你的表现重算推荐起点，并解释为什么从这一层开始。
+              </p>
+              <p className="text-xs text-indigo-700">
+                当前目标层级：
+                <span className="ml-1 font-semibold">
+                  {plan.goalLevel === "concept"
+                    ? "理解概念"
+                    : plan.goalLevel === "comprehensive"
+                    ? "冲综合题"
+                    : "会做基础题"}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {(plan.assessmentQuestions || []).map((item, index) => {
+            const passed = assessmentState?.results.some(
+              (result) => result.questionId === item.id && result.isCorrect
+            );
+            const failed = assessmentState?.results.some(
+              (result) => result.questionId === item.id && !result.isCorrect
+            );
+            return (
+              <div
+                key={item.id}
+                className={`glass-card p-4 text-center ${
+                  index === currentIndex ? "ring-2 ring-indigo-100 border-indigo-200" : ""
+                }`}
+              >
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Q{index + 1}
+                </div>
+                <div className="mt-2 text-xs text-slate-500">
+                  {passed ? "已通过" : failed ? "未通过" : "待完成"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="glass-card p-5 space-y-4">
+        <div className="text-sm font-semibold text-slate-800">
+          <MathText text={question.problem} />
+        </div>
+        <div className="grid gap-3">
+          {question.options.map((option) => (
+            <button
+              key={option}
+              onClick={() => onSelectAnswer(option)}
+              className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                selectedAnswer === option
+                  ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                  : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+            >
+              <MathText text={option} />
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-end">
+          <button onClick={onSubmit} className="btn-primary text-sm py-2.5">
+            <TestTubeDiagonal className="h-4 w-4" />
+            提交当前测试题
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 function PlanView({
   plan,
+  savedPath,
+  visibleNodeIds,
   activePhase,
   setActivePhase,
   activeNodeId,
   setActiveNodeId,
-  currentNodeId,
+  currentNode,
+  selectedNode,
   getMastery,
+  draftVerificationAnswer,
+  setDraftVerificationAnswer,
   onStartLearning,
-  onSelfCheck,
-  onBacktrack,
+  onEnterVerification,
+  onSubmitVerification,
+  onBacktrackReveal,
   onLater,
 }: {
   plan: LearningPlan;
+  savedPath?: LearningPathProgress;
+  visibleNodeIds: Set<string>;
   activePhase: number | null;
   setActivePhase: (phase: number | null) => void;
   activeNodeId: string | null;
   setActiveNodeId: (nodeId: string) => void;
-  currentNodeId: string;
+  currentNode: LearningPlanNode;
+  selectedNode: LearningPlanNode;
   getMastery: (id: string) => "none" | "low" | "medium" | "high" | "full";
+  draftVerificationAnswer: string;
+  setDraftVerificationAnswer: (value: string) => void;
   onStartLearning: () => void;
-  onSelfCheck: () => void;
-  onBacktrack: () => void;
+  onEnterVerification: () => void;
+  onSubmitVerification: () => void;
+  onBacktrackReveal: () => void;
   onLater: () => void;
 }) {
-  const currentNode =
-    plan.nodes.find((node) => node.knowledgeId === currentNodeId) || plan.nodes[0];
+  const currentNodeState =
+    savedPath?.session?.nodeStates?.[currentNode.knowledgeId] || "current";
+  const selectedNodeState =
+    savedPath?.session?.nodeStates?.[selectedNode.knowledgeId] || "locked";
+  const verificationResult = selectedNode.verificationQuestion
+    ? savedPath?.session?.verificationResults?.[selectedNode.verificationQuestion.id]
+    : undefined;
+  const visibleNodes = plan.nodes.filter(
+    (node) =>
+      visibleNodeIds.has(node.knowledgeId) &&
+      (activePhase === null || node.phase === activePhase)
+  );
 
   return (
     <div className="space-y-6">
@@ -544,7 +1306,14 @@ function PlanView({
                 <MathText text={plan.interpretation} />
               </p>
               <p className="text-xs text-emerald-700">
-                <MathText text={plan.whyStartHere || ""} />
+                <MathText
+                  text={
+                    savedPath?.session?.assessment?.summary ||
+                    plan.assessmentSummary ||
+                    plan.whyStartHere ||
+                    ""
+                  }
+                />
               </p>
             </div>
           </div>
@@ -552,7 +1321,10 @@ function PlanView({
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
           <MetricCard label="知识点" value={String(plan.nodes.length)} />
           <MetricCard label="预计分钟" value={String(plan.totalEstimatedMinutes)} />
-          <MetricCard label="当前模式" value={plan.generationMode === "assessment" ? "起点测试" : "快速生成"} />
+          <MetricCard
+            label="当前模式"
+            value={plan.generationMode === "assessment" ? "起点测试后执行" : "快速生成"}
+          />
           <MetricCard label="里程碑" value={plan.nextCheckpoint || "完成当前节点"} compact />
         </div>
       </div>
@@ -561,7 +1333,13 @@ function PlanView({
         <InfoCard
           title="推荐起点"
           icon={Play}
-          content={getKnowledgeNode(plan.recommendedStartId || "")?.name || "当前节点"}
+          content={
+            getKnowledgeNode(
+              savedPath?.session?.assessment?.recommendedStartId ||
+                plan.recommendedStartId ||
+                ""
+            )?.name || "当前节点"
+          }
           caption={plan.sessionPlan}
         />
         <InfoCard
@@ -580,7 +1358,7 @@ function PlanView({
           title="当前节点"
           icon={Flag}
           content={getKnowledgeNode(currentNode.knowledgeId)?.name || currentNode.knowledgeId}
-          caption={currentNode.reason}
+          caption={NODE_STATE_LABELS[currentNodeState]}
         />
       </div>
 
@@ -604,6 +1382,8 @@ function PlanView({
 
       <PlanGraph
         plan={plan}
+        savedPath={savedPath}
+        visibleNodeIds={visibleNodeIds}
         activePhase={activePhase}
         activeNodeId={activeNodeId}
         getMastery={getMastery}
@@ -616,71 +1396,66 @@ function PlanView({
             <BookOpen className="h-4 w-4" />
             路径目录
           </div>
-          {plan.nodes
-            .filter((node) => activePhase === null || node.phase === activePhase)
-            .map((node) => {
-              const nodeMeta = getKnowledgeNode(node.knowledgeId);
-              const isActive = node.knowledgeId === currentNode.knowledgeId;
-              return (
-                <button
-                  key={node.knowledgeId}
-                  onClick={() => setActiveNodeId(node.knowledgeId)}
-                  className={`w-full rounded-2xl border bg-white p-4 text-left transition-all ${
-                    isActive
-                      ? "border-emerald-300 shadow-sm ring-2 ring-emerald-100"
-                      : "border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="plan-phase-badge" data-phase={node.phase}>
-                      {node.phaseLabel}
-                    </span>
-                    <span className="font-semibold text-slate-800">
-                      {nodeMeta?.name || node.knowledgeId}
-                    </span>
-                    <span className="ml-auto text-xs text-slate-400">
-                      <Clock className="mr-1 inline h-3 w-3" />
-                      {node.estimatedMinutes}m
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-600">
-                    <MathText text={node.learnWhat || node.reason} />
-                  </p>
-                  {node.commonMistakes?.[0] && (
-                    <p className="mt-2 text-xs text-amber-600">
-                      易错点：<MathText text={node.commonMistakes[0]} />
-                    </p>
-                  )}
-                </button>
-              );
-            })}
+          {visibleNodes.map((node) => {
+            const nodeMeta = getKnowledgeNode(node.knowledgeId);
+            const nodeState =
+              savedPath?.session?.nodeStates?.[node.knowledgeId] || "locked";
+            const isSelected = node.knowledgeId === selectedNode.knowledgeId;
+            return (
+              <button
+                key={node.knowledgeId}
+                onClick={() => setActiveNodeId(node.knowledgeId)}
+                className={`w-full rounded-2xl border bg-white p-4 text-left transition-all ${
+                  isSelected
+                    ? "border-emerald-300 shadow-sm ring-2 ring-emerald-100"
+                    : "border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="plan-phase-badge" data-phase={node.phase}>
+                    {node.phaseLabel}
+                  </span>
+                  <span className="font-semibold text-slate-800">
+                    {nodeMeta?.name || node.knowledgeId}
+                  </span>
+                  <span className="ml-auto text-xs text-slate-400">
+                    <Clock className="mr-1 inline h-3 w-3" />
+                    {node.estimatedMinutes}m
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  <MathText text={node.learnWhat || node.reason} />
+                </p>
+                <div className="mt-2 text-xs text-slate-500">{NODE_STATE_LABELS[nodeState]}</div>
+              </button>
+            );
+          })}
         </div>
 
         <div className="space-y-4">
           <div className="glass-card p-5">
             <div className="mb-3 flex items-center gap-2">
               <Target className="h-4 w-4 text-emerald-500" />
-              <h4 className="font-bold text-slate-800">当前节点学习卡</h4>
+              <h4 className="font-bold text-slate-800">节点执行卡</h4>
             </div>
             <div className="space-y-4">
               <div>
                 <div className="text-sm font-semibold text-slate-800">
-                  {getKnowledgeNode(currentNode.knowledgeId)?.name || currentNode.knowledgeId}
+                  {getKnowledgeNode(selectedNode.knowledgeId)?.name || selectedNode.knowledgeId}
                 </div>
                 <div className="mt-1 text-xs text-slate-400">
-                  掌握度：{MASTERY_LABELS[getMastery(currentNode.knowledgeId)]}
+                  掌握度：{MASTERY_LABELS[getMastery(selectedNode.knowledgeId)]} · 状态：
+                  {NODE_STATE_LABELS[selectedNodeState]}
                 </div>
               </div>
-              <SectionBlock title="学什么" content={currentNode.learnWhat || currentNode.reason} />
-              <ListBlock title="学会标准" items={currentNode.masteryChecks || currentNode.objectives} />
-              <ListBlock title="常见错误" items={currentNode.commonMistakes || ["先看题型，再做动作。"]} />
+              <SectionBlock title="学什么" content={selectedNode.learnWhat || selectedNode.reason} />
+              <ListBlock title="学会标准" items={selectedNode.masteryChecks || selectedNode.objectives} />
+              <ListBlock title="常见错误" items={selectedNode.commonMistakes || ["先看条件，再决定动作。"]} />
               <ListBlock
                 title="前置节点"
                 items={
-                  (currentNode.prerequisiteIds || []).map(
-                    (id) => getKnowledgeNode(id)?.name || id
-                  ).length > 0
-                    ? (currentNode.prerequisiteIds || []).map(
+                  (selectedNode.prerequisiteIds || []).length > 0
+                    ? (selectedNode.prerequisiteIds || []).map(
                         (id) => getKnowledgeNode(id)?.name || id
                       )
                     : ["当前节点可以直接开始。"]
@@ -689,32 +1464,146 @@ function PlanView({
             </div>
           </div>
 
-          <div className="glass-card p-5 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-              <TestTubeDiagonal className="h-4 w-4 text-indigo-500" />
-              节点动作
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <button onClick={onStartLearning} className="btn-primary text-sm py-2.5">
-                <Play className="h-4 w-4" />
-                开始学习
-              </button>
-              <button onClick={onSelfCheck} className="btn-secondary text-sm py-2.5">
-                <TestTubeDiagonal className="h-4 w-4" />
-                直接自测
-              </button>
-              <button onClick={onBacktrack} className="btn-secondary text-sm py-2.5">
-                <Undo2 className="h-4 w-4" />
-                展开前置知识
-              </button>
-              <button onClick={onLater} className="btn-secondary text-sm py-2.5">
-                <RotateCcw className="h-4 w-4" />
-                标记稍后再学
-              </button>
-            </div>
-          </div>
+          <NodeActionCard
+            currentNode={currentNode}
+            selectedNode={selectedNode}
+            currentNodeState={currentNodeState}
+            verificationResult={verificationResult}
+            draftVerificationAnswer={draftVerificationAnswer}
+            setDraftVerificationAnswer={setDraftVerificationAnswer}
+            onStartLearning={onStartLearning}
+            onEnterVerification={onEnterVerification}
+            onSubmitVerification={onSubmitVerification}
+            onBacktrackReveal={onBacktrackReveal}
+            onLater={onLater}
+          />
         </div>
       </div>
+    </div>
+  );
+}
+
+function NodeActionCard({
+  currentNode,
+  selectedNode,
+  currentNodeState,
+  verificationResult,
+  draftVerificationAnswer,
+  setDraftVerificationAnswer,
+  onStartLearning,
+  onEnterVerification,
+  onSubmitVerification,
+  onBacktrackReveal,
+  onLater,
+}: {
+  currentNode: LearningPlanNode;
+  selectedNode: LearningPlanNode;
+  currentNodeState: LearningNodeExecutionState;
+  verificationResult?: LearningQuestionSubmissionResult;
+  draftVerificationAnswer: string;
+  setDraftVerificationAnswer: (value: string) => void;
+  onStartLearning: () => void;
+  onEnterVerification: () => void;
+  onSubmitVerification: () => void;
+  onBacktrackReveal: () => void;
+  onLater: () => void;
+}) {
+  const isCurrentNode = selectedNode.knowledgeId === currentNode.knowledgeId;
+
+  if (!isCurrentNode || !selectedNode.verificationQuestion) {
+    return (
+      <div className="glass-card p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700">
+          <Undo2 className="h-4 w-4 text-amber-500" />
+          当前节点补救分支
+        </div>
+        <ListBlock
+          title="回退提示"
+          items={
+            selectedNode.backtrackTo
+              ? [
+                  `卡住时回退到 ${
+                    getKnowledgeNode(selectedNode.backtrackTo)?.name ||
+                    selectedNode.backtrackTo
+                  }`,
+                ]
+              : ["当前节点没有更早前置，优先重新看学会标准。"]
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-card p-5 space-y-4">
+      <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+        <TestTubeDiagonal className="h-4 w-4 text-indigo-500" />
+        节点验证
+      </div>
+      {currentNodeState !== "verifying" ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button onClick={onStartLearning} className="btn-primary text-sm py-2.5">
+            <Play className="h-4 w-4" />
+            {currentNodeState === "learning" ? "继续学习中" : "开始学习"}
+          </button>
+          <button onClick={onEnterVerification} className="btn-secondary text-sm py-2.5">
+            <TestTubeDiagonal className="h-4 w-4" />
+            我学完了，进入验证
+          </button>
+          <button onClick={onBacktrackReveal} className="btn-secondary text-sm py-2.5">
+            <Undo2 className="h-4 w-4" />
+            展开补救分支
+          </button>
+          <button onClick={onLater} className="btn-secondary text-sm py-2.5">
+            <RotateCcw className="h-4 w-4" />
+            标记稍后再学
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <MathText text={selectedNode.verificationQuestion.problem} />
+          </div>
+          <div className="grid gap-3">
+            {selectedNode.verificationQuestion.options.map((option) => (
+              <button
+                key={option}
+                onClick={() => setDraftVerificationAnswer(option)}
+                className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                  draftVerificationAnswer === option
+                    ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <MathText text={option} />
+              </button>
+            ))}
+          </div>
+          <button onClick={onSubmitVerification} className="btn-primary text-sm py-2.5">
+            <TestTubeDiagonal className="h-4 w-4" />
+            提交验证
+          </button>
+        </div>
+      )}
+      {verificationResult && (
+        <div
+          className={`rounded-xl px-4 py-3 text-sm ${
+            verificationResult.isCorrect
+              ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border border-amber-200 bg-amber-50 text-amber-700"
+          }`}
+        >
+          <div className="mb-1 flex items-center gap-2 font-semibold">
+            {verificationResult.isCorrect ? (
+              <CheckCircle2 className="h-4 w-4" />
+            ) : (
+              <XCircle className="h-4 w-4" />
+            )}
+            {verificationResult.isCorrect ? "验证通过" : "验证未通过"}
+          </div>
+          <MathText text={selectedNode.verificationQuestion.explanation} />
+        </div>
+      )}
     </div>
   );
 }
@@ -800,22 +1689,27 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
 
 function PlanGraph({
   plan,
+  savedPath,
+  visibleNodeIds,
   activePhase,
   activeNodeId,
   getMastery,
   onSelectNode,
 }: {
   plan: LearningPlan;
+  savedPath?: LearningPathProgress;
+  visibleNodeIds: Set<string>;
   activePhase: number | null;
   activeNodeId: string | null;
   getMastery: (id: string) => "none" | "low" | "medium" | "high" | "full";
   onSelectNode: (nodeId: string) => void;
 }) {
   const { flowNodes, flowEdges } = useMemo(() => {
-    const filteredNodes =
-      activePhase === null
-        ? plan.nodes
-        : plan.nodes.filter((node) => node.phase === activePhase);
+    const filteredNodes = plan.nodes.filter(
+      (node) =>
+        visibleNodeIds.has(node.knowledgeId) &&
+        (activePhase === null || node.phase === activePhase)
+    );
     const nodeSet = new Set(filteredNodes.map((node) => node.knowledgeId));
 
     const nodes: Node[] = filteredNodes.map((node, index) => {
@@ -839,6 +1733,15 @@ function PlanGraph({
 
     const edges: Edge[] = plan.edges
       .filter((edge) => nodeSet.has(edge.source) && nodeSet.has(edge.target))
+      .filter((edge) => {
+        if (edge.type === "progress") {
+          return true;
+        }
+        return (
+          Boolean(savedPath?.session?.revealedRemedialNodeIds.length) ||
+          savedPath?.session?.nodeStates?.[edge.source] === "failed"
+        );
+      })
       .map((edge) => ({
         id: `${edge.type}-${edge.source}-${edge.target}`,
         source: edge.source,
@@ -862,18 +1765,19 @@ function PlanGraph({
       }));
 
     return { flowNodes: nodes, flowEdges: edges };
-  }, [activeNodeId, activePhase, getMastery, plan.edges, plan.nodes]);
+  }, [
+    activeNodeId,
+    activePhase,
+    getMastery,
+    plan.edges,
+    plan.nodes,
+    savedPath?.session?.nodeStates,
+    savedPath?.session?.revealedRemedialNodeIds.length,
+    visibleNodeIds,
+  ]);
 
   const [nodes, , onNodesChange] = useNodesState(flowNodes);
   const [edges, , onEdgesChange] = useEdgesState(flowEdges);
-
-  useEffect(() => {
-    nodes.forEach((node) => {
-      if (node.id === activeNodeId) {
-        onSelectNode(node.id);
-      }
-    });
-  }, [activeNodeId, nodes, onSelectNode]);
 
   return (
     <div className="glass-card overflow-hidden" style={{ height: "440px" }}>

@@ -2,6 +2,7 @@ import type {
   LearningBaseLevel,
   LearningGenerationMode,
   LearningGoalLevel,
+  LearningQuestionSubmissionResult,
   PracticeQuestion,
 } from "@/types";
 
@@ -11,6 +12,12 @@ export interface GenerateLearningPlanInput {
   baseLevel?: LearningBaseLevel;
   goalLevel?: LearningGoalLevel;
   generationMode?: LearningGenerationMode;
+  assessmentResults?: Array<
+    Pick<
+      LearningQuestionSubmissionResult,
+      "questionId" | "knowledgeId" | "answer" | "isCorrect"
+    >
+  >;
   requestId: string;
 }
 

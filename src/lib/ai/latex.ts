@@ -161,7 +161,28 @@ export function normalizeLearningPlanLatex(plan: LearningPlan): LearningPlan {
       learnWhat: normalizeOptionalText(node.learnWhat),
       masteryChecks: node.masteryChecks?.map(normalizeRenderableText),
       commonMistakes: node.commonMistakes?.map(normalizeRenderableText),
+      verificationQuestion: node.verificationQuestion
+        ? {
+            ...node.verificationQuestion,
+            problem: normalizeRenderableText(node.verificationQuestion.problem),
+            options: node.verificationQuestion.options.map(normalizeRenderableText),
+            correctAnswer: normalizeRenderableText(
+              node.verificationQuestion.correctAnswer
+            ),
+            explanation: normalizeRenderableText(
+              node.verificationQuestion.explanation
+            ),
+          }
+        : undefined,
     })),
+    assessmentQuestions: plan.assessmentQuestions?.map((question) => ({
+      ...question,
+      problem: normalizeRenderableText(question.problem),
+      options: question.options.map(normalizeRenderableText),
+      correctAnswer: normalizeRenderableText(question.correctAnswer),
+      explanation: normalizeRenderableText(question.explanation),
+    })),
+    assessmentSummary: normalizeOptionalText(plan.assessmentSummary),
   };
 }
 

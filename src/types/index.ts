@@ -148,6 +148,36 @@ export interface SolutionPath {
 export type LearningBaseLevel = "zero" | "basic" | "sprint";
 export type LearningGoalLevel = "concept" | "basic-problems" | "comprehensive";
 export type LearningGenerationMode = "quick" | "assessment";
+export type LearningQuestionPurpose = "assessment" | "verification";
+export type LearningAssessmentStatus = "pending" | "in_progress" | "completed";
+export type LearningNodeExecutionState =
+  | "locked"
+  | "current"
+  | "learning"
+  | "verifying"
+  | "passed"
+  | "failed"
+  | "backtracking"
+  | "skipped";
+
+export interface LearningQuestion {
+  id: string;
+  problem: string;
+  options: string[];
+  correctAnswer: string;
+  explanation: string;
+  purpose: LearningQuestionPurpose;
+  knowledgeId: string;
+  goalLevel: LearningGoalLevel;
+}
+
+export interface LearningQuestionSubmissionResult {
+  questionId: string;
+  knowledgeId: string;
+  answer: string;
+  isCorrect: boolean;
+  submittedAt: string;
+}
 
 /** AI 学习规划器输出的单个节点 */
 export interface LearningPlanNode {
@@ -168,6 +198,8 @@ export interface LearningPlanNode {
   commonMistakes?: string[]; // 支持 LaTeX
   /** 明示的前置节点 */
   prerequisiteIds?: string[];
+  /** 当前节点的验证题 */
+  verificationQuestion?: LearningQuestion;
 }
 
 /** 学习规划的阶段描述 */
@@ -217,6 +249,10 @@ export interface LearningPlan {
   sessionPlan?: string; // 支持 LaTeX
   /** 当前里程碑 */
   nextCheckpoint?: string; // 支持 LaTeX
+  /** 起点测试题 */
+  assessmentQuestions?: LearningQuestion[];
+  /** 起点测试后的解释 */
+  assessmentSummary?: string; // 支持 LaTeX
   /** 响应元数据 */
   meta?: ApiResponseMeta;
 }
@@ -415,6 +451,23 @@ export interface LearningPathProgress {
   status: "active" | "completed";
   activeDiagnosisQuestionId?: string;
   activeSolveProblemKey?: string;
+  session?: {
+    assessment?: {
+      status: LearningAssessmentStatus;
+      currentIndex: number;
+      answers: Record<string, string>;
+      results: LearningQuestionSubmissionResult[];
+      recommendedStartId?: string;
+      summary?: string;
+      completedAt?: string;
+    };
+    nodeStates: Record<string, LearningNodeExecutionState>;
+    verificationResults: Record<string, LearningQuestionSubmissionResult>;
+    failureCounts: Record<string, number>;
+    revealedRemedialNodeIds: string[];
+    repairedNodeIds: string[];
+    activeNodeMode?: "learning" | "verifying";
+  };
 }
 
 export interface StudentProgress {
@@ -439,6 +492,10 @@ export interface AppState {
   addPracticeRecord: (record: StudentProgress["practiceHistory"][0]) => void;
   upsertLearningPath: (path: LearningPathProgress) => void;
   completeLearningPathStep: (targetId: string, completedNodeId: string, nextNodeId?: string) => void;
+  updateLearningPathSession: (
+    targetId: string,
+    updater: (path: LearningPathProgress) => LearningPathProgress
+  ) => void;
   recordDiagnosis: (diagnosis: DiagnosticResult) => DiagnosisRecord;
   submitDiagnosisMicroExercise: (
     questionId: string,

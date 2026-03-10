@@ -75,7 +75,18 @@ function ensureProgress(progress?: Partial<StudentProgress>): StudentProgress {
   return {
     knowledge: progress?.knowledge || {},
     practiceHistory: progress?.practiceHistory || [],
-    learningPaths: progress?.learningPaths || [],
+    learningPaths: (progress?.learningPaths || []).map((path) => ({
+      ...path,
+      session: {
+        assessment: path.session?.assessment,
+        nodeStates: path.session?.nodeStates || {},
+        verificationResults: path.session?.verificationResults || {},
+        failureCounts: path.session?.failureCounts || {},
+        revealedRemedialNodeIds: path.session?.revealedRemedialNodeIds || [],
+        repairedNodeIds: path.session?.repairedNodeIds || [],
+        activeNodeMode: path.session?.activeNodeMode,
+      },
+    })),
     diagnosisRecords: progress?.diagnosisRecords || [],
     solutionAttempts: progress?.solutionAttempts || [],
   };
@@ -226,9 +237,61 @@ export const useAppStore = create<AppState>()(
           const nextPaths =
             existing >= 0
               ? progress.learningPaths.map((item, index) =>
-                  index === existing ? path : item
+                  index === existing
+                    ? {
+                        ...item,
+                        ...path,
+                        session: {
+                          assessment:
+                            path.session?.assessment || item.session?.assessment,
+                          nodeStates: {
+                            ...(item.session?.nodeStates || {}),
+                            ...(path.session?.nodeStates || {}),
+                          },
+                          verificationResults: {
+                            ...(item.session?.verificationResults || {}),
+                            ...(path.session?.verificationResults || {}),
+                          },
+                          failureCounts: {
+                            ...(item.session?.failureCounts || {}),
+                            ...(path.session?.failureCounts || {}),
+                          },
+                          revealedRemedialNodeIds: Array.from(
+                            new Set([
+                              ...(item.session?.revealedRemedialNodeIds || []),
+                              ...(path.session?.revealedRemedialNodeIds || []),
+                            ])
+                          ),
+                          repairedNodeIds: Array.from(
+                            new Set([
+                              ...(item.session?.repairedNodeIds || []),
+                              ...(path.session?.repairedNodeIds || []),
+                            ])
+                          ),
+                          activeNodeMode:
+                            path.session?.activeNodeMode ||
+                            item.session?.activeNodeMode,
+                        },
+                      }
+                    : item
                 )
-              : [...progress.learningPaths, path];
+              : [
+                  ...progress.learningPaths,
+                  {
+                    ...path,
+                    session: {
+                      assessment: path.session?.assessment,
+                      nodeStates: path.session?.nodeStates || {},
+                      verificationResults:
+                        path.session?.verificationResults || {},
+                      failureCounts: path.session?.failureCounts || {},
+                      revealedRemedialNodeIds:
+                        path.session?.revealedRemedialNodeIds || [],
+                      repairedNodeIds: path.session?.repairedNodeIds || [],
+                      activeNodeMode: path.session?.activeNodeMode,
+                    },
+                  },
+                ];
 
           return {
             progress: {
@@ -252,6 +315,22 @@ export const useAppStore = create<AppState>()(
             );
             const reachedEnd =
               !nextNodeId || completedNodeIds.length >= path.totalSteps;
+            const nextSession: NonNullable<LearningPathProgress["session"]> = {
+              assessment: path.session?.assessment,
+              nodeStates: {
+                ...(path.session?.nodeStates || {}),
+                [completedNodeId]: "passed",
+                ...(nextNodeId ? { [nextNodeId]: "current" as const } : {}),
+              },
+              verificationResults: path.session?.verificationResults || {},
+              failureCounts: path.session?.failureCounts || {},
+              revealedRemedialNodeIds:
+                path.session?.revealedRemedialNodeIds || [],
+              repairedNodeIds: Array.from(
+                new Set([...(path.session?.repairedNodeIds || []), completedNodeId])
+              ),
+              activeNodeMode: reachedEnd ? undefined : "learning",
+            };
 
             return {
               ...path,
@@ -263,6 +342,7 @@ export const useAppStore = create<AppState>()(
               status: reachedEnd ? ("completed" as const) : ("active" as const),
               updatedAt: new Date().toISOString(),
               activeDiagnosisQuestionId: undefined,
+              session: nextSession,
             };
           });
 
@@ -270,6 +350,20 @@ export const useAppStore = create<AppState>()(
             progress: {
               ...progress,
               learningPaths: nextPaths,
+            },
+          };
+        });
+      },
+
+      updateLearningPathSession: (targetId, updater) => {
+        set((state) => {
+          const progress = ensureProgress(state.progress);
+          return {
+            progress: {
+              ...progress,
+              learningPaths: progress.learningPaths.map((path) =>
+                path.targetId === targetId ? updater(path) : path
+              ),
             },
           };
         });
@@ -668,7 +762,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "prism-student-progress",
-      version: 3,
+      version: 4,
       migrate: (persistedState) => {
         if (
           persistedState &&

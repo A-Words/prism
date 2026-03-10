@@ -161,6 +161,18 @@ export const learningPlanNodeSchema = z.object({
   masteryChecks: z.array(z.string().min(1)).optional(),
   commonMistakes: z.array(z.string().min(1)).optional(),
   prerequisiteIds: z.array(z.string().min(1)).optional(),
+  verificationQuestion: z
+    .object({
+      id: z.string().min(1),
+      problem: z.string().min(1),
+      options: z.array(z.string().min(1)).length(4),
+      correctAnswer: z.string().min(1),
+      explanation: z.string().min(1),
+      purpose: z.enum(["assessment", "verification"]),
+      knowledgeId: z.string().min(1),
+      goalLevel: learningGoalLevelSchema,
+    })
+    .optional(),
 });
 
 export const learningPhaseSchema = z.object({
@@ -196,7 +208,58 @@ export const learningPlanSchema = z.object({
   whyStartHere: z.string().optional(),
   sessionPlan: z.string().optional(),
   nextCheckpoint: z.string().optional(),
+  assessmentQuestions: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        problem: z.string().min(1),
+        options: z.array(z.string().min(1)).length(4),
+        correctAnswer: z.string().min(1),
+        explanation: z.string().min(1),
+        purpose: z.enum(["assessment", "verification"]),
+        knowledgeId: z.string().min(1),
+        goalLevel: learningGoalLevelSchema,
+      })
+    )
+    .length(3)
+    .optional(),
+  assessmentSummary: z.string().optional(),
   meta: apiMetaSchema.optional(),
+});
+
+export const learningQuestionBankSchema = z.object({
+  assessmentQuestions: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        problem: z.string().min(1),
+        options: z.array(z.string().min(1)).length(4),
+        correctAnswer: z.string().min(1),
+        explanation: z.string().min(1),
+        purpose: z.literal("assessment"),
+        knowledgeId: z.string().min(1),
+        goalLevel: learningGoalLevelSchema,
+      })
+    )
+    .length(3),
+  verificationQuestions: z
+    .array(
+      z.object({
+        knowledgeId: z.string().min(1),
+        question: z.object({
+          id: z.string().min(1),
+          problem: z.string().min(1),
+          options: z.array(z.string().min(1)).length(4),
+          correctAnswer: z.string().min(1),
+          explanation: z.string().min(1),
+          purpose: z.literal("verification"),
+          knowledgeId: z.string().min(1),
+          goalLevel: learningGoalLevelSchema,
+        }),
+      })
+    )
+    .min(2)
+    .max(7),
 });
 
 export const microExerciseSchema = z.object({

@@ -9,6 +9,16 @@ const requestSchema = z.object({
   baseLevel: z.enum(["zero", "basic", "sprint"]).optional(),
   goalLevel: z.enum(["concept", "basic-problems", "comprehensive"]).optional(),
   generationMode: z.enum(["quick", "assessment"]).optional(),
+  assessmentResults: z
+    .array(
+      z.object({
+        questionId: z.string().min(1),
+        knowledgeId: z.string().min(1),
+        answer: z.string().min(1),
+        isCorrect: z.boolean(),
+      })
+    )
+    .optional(),
 });
 
 export async function POST(request: Request) {
@@ -20,6 +30,7 @@ export async function POST(request: Request) {
       baseLevel,
       goalLevel,
       generationMode,
+      assessmentResults,
     } = requestSchema.parse(await request.json());
 
     if (
@@ -38,6 +49,7 @@ export async function POST(request: Request) {
       baseLevel,
       goalLevel,
       generationMode,
+      assessmentResults,
       requestId,
     });
 

@@ -2,12 +2,17 @@ import type {
   KnowledgeNode,
   LearningPlan,
   LearningPlanNode,
+  LearningQuestion,
   MockLearningScenario,
 } from "@/types";
 import { buildKnowledgeContext } from "@/lib/ai/context";
 import { normalizeLearningPlanLatex } from "@/lib/ai/latex";
 import { getAIProvider } from "@/lib/ai/provider";
-import { learningPlanCopySchema, learningPlanSchema } from "@/lib/ai/schemas";
+import {
+  learningPlanCopySchema,
+  learningPlanSchema,
+  learningQuestionBankSchema,
+} from "@/lib/ai/schemas";
 import {
   computeLearningPath,
   getKnowledgeNode,
@@ -335,6 +340,240 @@ function buildEdges(nodes: LearningPlanNode[]) {
   });
 }
 
+function getGoalLevelLabel(goalLevel: GenerateLearningPlanInput["goalLevel"]) {
+  switch (goalLevel || "basic-problems") {
+    case "concept":
+      return "概念辨析";
+    case "comprehensive":
+      return "综合迁移";
+    default:
+      return "基础题";
+  }
+}
+
+function getAssessmentNodes(nodes: LearningPlanNode[]) {
+  if (nodes.length === 0) {
+    return [];
+  }
+
+  const tail = nodes.slice(Math.max(0, nodes.length - 3));
+  const padded = [...tail];
+  while (padded.length < 3) {
+    padded.unshift(nodes[0]);
+  }
+  return padded.slice(-3);
+}
+
+function createQuestionOptions(
+  node: LearningPlanNode,
+  goalLevel: GenerateLearningPlanInput["goalLevel"],
+  purpose: "assessment" | "verification"
+) {
+  const nodeName = getKnowledgeNode(node.knowledgeId)?.name || node.knowledgeId;
+  const learnWhat =
+    node.learnWhat?.replace(/[。！!？?]$/, "") ||
+    `围绕 ${nodeName} 先把关键判断动作站稳`;
+
+  if ((goalLevel || "basic-problems") === "concept") {
+    const correct = `先理解 ${nodeName} 的判断依据，再做概念辨析。`;
+    return {
+      correct,
+      options: [
+        correct,
+        `直接跳到综合题，用题量代替对 ${nodeName} 的理解。`,
+        `只背 ${nodeName} 的结论，不必区分适用条件。`,
+        `先忽略前置知识，卡住时再临时补。`,
+      ],
+      explanation:
+        purpose === "assessment"
+          ? `${nodeName} 在概念层最关键的是判断依据是否清楚，而不是先堆题量。`
+          : `概念层验证关注的是你是否真的理解 ${nodeName} 的核心判断。`,
+    };
+  }
+
+  if ((goalLevel || "basic-problems") === "comprehensive") {
+    const correct = `先识别条件和目标，再调用 ${nodeName} 完成关键一步。`;
+    return {
+      correct,
+      options: [
+        correct,
+        `一看到题目就直接硬算，不必先判断 ${nodeName} 是否适用。`,
+        `先把所有相关公式都写下来，再决定有没有用。`,
+        `先跳过 ${nodeName}，等最后一步再补判断。`,
+      ],
+      explanation:
+        purpose === "assessment"
+          ? `综合题里先判断条件与目标，再决定如何调用 ${nodeName}，比盲目展开稳得多。`
+          : `综合层验证不是看你会不会背，而是看你能不能把 ${nodeName} 放在正确的位置。`,
+    };
+  }
+
+  const correct = `先${learnWhat}，再完成 1 道围绕 ${nodeName} 的标准基础题。`;
+  return {
+    correct,
+    options: [
+      correct,
+      `先做 5 道混合题，哪里错了再回头猜 ${nodeName} 的规律。`,
+      `先背答案格式，不需要先确认 ${nodeName} 的适用条件。`,
+      `先跳到目标题型，遇到不会的地方再补 ${nodeName}。`,
+    ],
+    explanation:
+      purpose === "assessment"
+        ? `基础题层更看重动作是否稳定，先把 ${nodeName} 的标准入口走顺。`
+        : `验证题会优先检查你是否能按标准动作调用 ${nodeName}。`,
+  };
+}
+
+function createRuleLearningQuestion(params: {
+  node: LearningPlanNode;
+  goalLevel: GenerateLearningPlanInput["goalLevel"];
+  purpose: "assessment" | "verification";
+  index: number;
+}) {
+  const { node, goalLevel, purpose, index } = params;
+  const nodeName = getKnowledgeNode(node.knowledgeId)?.name || node.knowledgeId;
+  const { correct, options, explanation } = createQuestionOptions(
+    node,
+    goalLevel,
+    purpose
+  );
+  const questionLead =
+    purpose === "assessment"
+      ? `起点测试 ${index + 1}`
+      : `节点验证 ${index + 1}`;
+  const goalLabel = getGoalLevelLabel(goalLevel);
+
+  return {
+    id: `${purpose}-${node.knowledgeId}-${goalLevel || "basic-problems"}-${index + 1}`,
+    problem:
+      purpose === "assessment"
+        ? `${questionLead}：如果你现在要判断自己是否适合直接进入「${nodeName}」，下面哪种做法更符合 ${goalLabel} 目标？`
+        : `${questionLead}：围绕「${nodeName}」继续学习后，下面哪种推进方式更符合 ${goalLabel} 层级要求？`,
+    options,
+    correctAnswer: correct,
+    explanation,
+    purpose,
+    knowledgeId: node.knowledgeId,
+    goalLevel: goalLevel || "basic-problems",
+  } satisfies LearningQuestion;
+}
+
+function buildRuleQuestionBank(
+  plan: LearningPlan,
+  input: GenerateLearningPlanInput
+) {
+  const assessmentQuestions = getAssessmentNodes(plan.nodes).map(
+    (node, index) => {
+      return createRuleLearningQuestion({
+        node,
+        goalLevel: input.goalLevel,
+        purpose: "assessment",
+        index,
+      });
+    }
+  );
+
+  const verificationQuestions = plan.nodes.map((node, index) => ({
+    knowledgeId: node.knowledgeId,
+    question: createRuleLearningQuestion({
+      node,
+      goalLevel: input.goalLevel,
+      purpose: "verification",
+      index,
+    }),
+  }));
+
+  return {
+    assessmentQuestions,
+    verificationQuestions,
+  };
+}
+
+function applyQuestionBank(
+  plan: LearningPlan,
+  questionBank: {
+    assessmentQuestions: LearningQuestion[];
+    verificationQuestions: Array<{
+      knowledgeId: string;
+      question: LearningQuestion;
+    }>;
+  }
+) {
+  const verificationByKnowledge = new Map(
+    questionBank.verificationQuestions.map((item) => [item.knowledgeId, item.question])
+  );
+
+  return {
+    ...plan,
+    assessmentQuestions: questionBank.assessmentQuestions,
+    nodes: plan.nodes.map((node) => ({
+      ...node,
+      verificationQuestion:
+        verificationByKnowledge.get(node.knowledgeId) || node.verificationQuestion,
+    })),
+  };
+}
+
+function buildAssessmentSummary(
+  recommendedStartId: string,
+  targetName: string,
+  results: NonNullable<GenerateLearningPlanInput["assessmentResults"]>
+) {
+  const missed = results.filter((item) => !item.isCorrect);
+  const startName = getKnowledgeNode(recommendedStartId)?.name || recommendedStartId;
+  if (missed.length === 0) {
+    return `3 题起点测试都通过，建议直接从 ${startName} 开始，把时间压到离 ${targetName} 最近的一层。`;
+  }
+
+  const missedNames = missed
+    .map((item) => getKnowledgeNode(item.knowledgeId)?.name || item.knowledgeId)
+    .join("、");
+  return `起点测试显示你在 ${missedNames} 这一层还不稳定，所以先从 ${startName} 开始回补，再推进到 ${targetName}。`;
+}
+
+function applyAssessmentResults(
+  plan: LearningPlan,
+  input: GenerateLearningPlanInput,
+  resolution: TargetResolution
+) {
+  const results = input.assessmentResults;
+  if (!results || results.length === 0) {
+    return plan;
+  }
+
+  const orderedNodes = getAssessmentNodes(plan.nodes);
+  const orderedIds = orderedNodes.map((node) => node.knowledgeId);
+  const firstMissed = orderedNodes.find(
+    (node, index) =>
+      !results[index]?.isCorrect &&
+      results[index]?.knowledgeId === node.knowledgeId
+  );
+  const recommendedStartId =
+    firstMissed?.knowledgeId ||
+    orderedIds[orderedIds.length - 1] ||
+    plan.recommendedStartId;
+  const startIndex = Math.max(
+    0,
+    plan.nodes.findIndex((node) => node.knowledgeId === recommendedStartId)
+  );
+
+  return {
+    ...plan,
+    recommendedStartId,
+    currentNodeId: recommendedStartId,
+    whyStartHere:
+      recommendedStartId === resolution.target.id
+        ? `起点测试显示你已经能直接进入 ${resolution.target.name}，所以本轮从目标节点开始。`
+        : `起点测试显示你在 ${getKnowledgeNode(recommendedStartId || "")?.name || recommendedStartId} 这层还不稳定，因此先从这里起步更稳。`,
+    assessmentSummary: buildAssessmentSummary(
+      recommendedStartId || resolution.target.id,
+      resolution.target.name,
+      results
+    ),
+    sessionPlan: `建议拆成 ${Math.max(2, plan.nodes.length - startIndex)} 次短学习，每次推进 1 个节点并完成 1 道验证题。`,
+  };
+}
+
 function getRecommendedStart(
   nodes: LearningPlanNode[],
   input: GenerateLearningPlanInput
@@ -432,6 +671,14 @@ type LearningCopy = {
   }>;
 };
 
+type LearningQuestionBank = {
+  assessmentQuestions: LearningQuestion[];
+  verificationQuestions: Array<{
+    knowledgeId: string;
+    question: LearningQuestion;
+  }>;
+};
+
 function mergeLearningCopy(plan: LearningPlan, copy: LearningCopy) {
   const nodeCopyMap = new Map(copy.nodes.map((node) => [node.knowledgeId, node]));
   return {
@@ -456,6 +703,13 @@ function mergeLearningCopy(plan: LearningPlan, copy: LearningCopy) {
       };
     }),
   };
+}
+
+function mergeLearningQuestionBank(
+  plan: LearningPlan,
+  questionBank: LearningQuestionBank
+) {
+  return applyQuestionBank(plan, questionBank);
 }
 
 async function tryEnhanceLearningPlan(
@@ -525,14 +779,65 @@ async function tryEnhanceLearningPlan(
   };
 }
 
+async function tryEnhanceLearningQuestions(
+  basePlan: LearningPlan,
+  input: GenerateLearningPlanInput,
+  resolution: TargetResolution
+) {
+  const provider = getAIProvider();
+  if (!provider.isConfigured()) {
+    throw new Error("AI provider is not configured");
+  }
+
+  const ruleQuestionBank = buildRuleQuestionBank(basePlan, input);
+  const { object } = await provider.generateStructured({
+    system: [
+      "你是高中数学学习评估题设计助手。",
+      "你只能改写题目文本、选项、正确答案和解释，不能改知识点 ID、goalLevel、purpose，也不能改题目数量。",
+      "assessment 题用于 3 题起点测试，verification 题用于节点验证。",
+      "题目必须是中文四选一，难度要明显受 goalLevel 影响：concept 偏概念辨析，basic-problems 偏标准套路，comprehensive 偏迁移判断。",
+      "涉及公式时优先使用 $...$ 或 $$...$$。",
+    ].join("\n"),
+    prompt: [
+      `学习目标：${input.query?.trim() || resolution.target.name}`,
+      `目标知识点：${resolution.target.name} (${resolution.target.id})`,
+      `目标层级：${input.goalLevel || "basic-problems"}`,
+      "",
+      "请基于以下规则兜底题模板，改写为更自然、可执行的学习评估题。不要改动 id、knowledgeId、purpose、goalLevel。",
+      JSON.stringify(ruleQuestionBank, null, 2),
+    ].join("\n"),
+    schema: learningQuestionBankSchema,
+    temperature: 0.4,
+    timeoutMs: 45_000,
+    allowLatex: true,
+    repairJson: true,
+  });
+
+  return mergeLearningQuestionBank(
+    basePlan,
+    object as LearningQuestionBank
+  );
+}
+
 export async function generateLearningPlan(input: GenerateLearningPlanInput) {
   const resolution = resolveLearningTarget(input);
-  const rulePlan = normalizeLearningPlanLatex(buildRulePlan(input, resolution));
+  let rulePlan = buildRulePlan(input, resolution);
+  rulePlan = applyQuestionBank(rulePlan, buildRuleQuestionBank(rulePlan, input));
+  rulePlan = applyAssessmentResults(rulePlan, input, resolution);
+  rulePlan = normalizeLearningPlanLatex(rulePlan);
 
   try {
     const aiResult = await tryEnhanceLearningPlan(rulePlan, input, resolution);
+    let enhancedPlan = aiResult.plan;
+    try {
+      enhancedPlan = normalizeLearningPlanLatex(
+        await tryEnhanceLearningQuestions(enhancedPlan, input, resolution)
+      );
+    } catch {
+      enhancedPlan = aiResult.plan;
+    }
     return withMeta(
-      aiResult.plan,
+      learningPlanSchema.parse(enhancedPlan),
       buildMeta({
         requestId: input.requestId,
         source: "ai",
