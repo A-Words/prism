@@ -590,35 +590,24 @@ function SolutionPathView({
         data: {
           title: step.title,
           content: step.content,
-          explanation: step.explanation,
           stepType: step.type,
-          knowledgePoints: step.knowledgePoints,
-          isExpanded: activeStep?.id === step.id || isHighlightedBranch,
+          isActive: activeStep?.id === step.id || isHighlightedBranch,
           onToggle: () => onSelectStep(step.id),
           stepState:
             isHighlightedBranch && stepStates[step.id] === "locked"
               ? "hinted"
               : stepStates[step.id] || "locked",
-          whyThisStep: step.whyThisStep,
-          commonMistake: step.commonMistake,
-          alternativeApproach: step.alternativeApproach,
-          interactionPoint: step.interactionPoint,
           branchType: step.branchType,
           branchRecoveryHint: step.branchRecoveryHint,
-          submittedAttempt: attempts[step.id],
         } satisfies SolutionNodeData,
       };
     });
   }, [
     activeStep,
-    attempts,
     highlightedBranchStepIds,
     mainSteps,
-    onSelectAnswer,
     onSelectStep,
-    onSubmitAttempt,
     path.steps,
-    selectedAnswers,
     stepStates,
   ]);
 

@@ -7,15 +7,12 @@ import {
   SOLUTION_STATE_LABELS,
   STEP_TYPE_COLORS,
   STEP_TYPE_LABELS,
-  type InteractionPoint,
   type SolutionBranchType,
-  type SolutionStepAttempt,
   type SolutionStepState,
   type SolutionStepType,
 } from "@/types";
 import {
   AlertTriangle,
-  ArrowRightLeft,
   Brain,
   Calculator,
   CheckCircle2,
@@ -46,19 +43,12 @@ const STATE_ICONS: Record<SolutionStepState, React.ElementType> = {
 export type SolutionNodeData = {
   title: string;
   content: string;
-  explanation: string;
   stepType: SolutionStepType;
-  knowledgePoints: string[];
-  isExpanded?: boolean;
+  isActive?: boolean;
   onToggle?: () => void;
   stepState?: SolutionStepState;
-  whyThisStep?: string;
-  commonMistake?: string;
-  alternativeApproach?: string;
-  interactionPoint?: InteractionPoint;
   branchType?: SolutionBranchType;
   branchRecoveryHint?: string;
-  submittedAttempt?: SolutionStepAttempt;
 };
 
 function SolutionNodeComponent({ data }: NodeProps) {
@@ -67,17 +57,11 @@ function SolutionNodeComponent({ data }: NodeProps) {
     title,
     content,
     stepType,
-    isExpanded,
-    explanation,
+    isActive,
     onToggle,
     stepState = "locked",
-    whyThisStep,
-    commonMistake,
-    alternativeApproach,
-    interactionPoint,
     branchType = "main",
     branchRecoveryHint,
-    submittedAttempt,
   } = nodeData;
 
   const color = branchType === "mistake" ? "#f97316" : STEP_TYPE_COLORS[stepType];
@@ -90,9 +74,8 @@ function SolutionNodeComponent({ data }: NodeProps) {
       className="solution-step-node"
       data-state={stepState}
       data-branch={branchType}
-      style={{
-        borderColor: isExpanded ? color : undefined,
-      }}
+      data-active={isActive ? "true" : "false"}
+      style={{ borderColor: isActive ? color : undefined }}
       onClick={onToggle}
     >
       <Handle
@@ -148,69 +131,6 @@ function SolutionNodeComponent({ data }: NodeProps) {
         <div className="mt-3 rounded-lg bg-orange-50 px-3 py-2.5 text-xs text-orange-700">
           <span className="font-semibold">回正动作：</span>
           <MathText text={branchRecoveryHint} />
-        </div>
-      )}
-
-      {isExpanded && whyThisStep && branchType !== "mistake" && (
-        <div className="mt-3 flex items-start gap-2 text-xs text-indigo-600 bg-indigo-50 rounded-lg p-2.5">
-          <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-          <span>
-            <MathText text={whyThisStep} />
-          </span>
-        </div>
-      )}
-
-      {isExpanded && explanation && (
-        <div className="mt-2 pt-2 border-t border-slate-100">
-          <div className="text-xs text-slate-500 leading-relaxed">
-            <MathText text={explanation} />
-          </div>
-        </div>
-      )}
-
-      {isExpanded && commonMistake && branchType !== "mistake" && (
-        <div className="mt-2 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg p-2.5">
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-          <div>
-            <span className="font-semibold">易错点：</span>
-            <MathText text={commonMistake} />
-          </div>
-        </div>
-      )}
-
-      {isExpanded && alternativeApproach && branchType !== "mistake" && (
-        <div className="mt-2 flex items-start gap-2 text-xs text-cyan-700 bg-cyan-50 rounded-lg p-2.5">
-          <ArrowRightLeft className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-          <div>
-            <span className="font-semibold">替代路线：</span>
-            <MathText text={alternativeApproach} />
-          </div>
-        </div>
-      )}
-
-      {isExpanded && interactionPoint && branchType !== "mistake" && (
-        <div className="mt-3 rounded-lg bg-indigo-50 px-3 py-2.5 text-xs text-indigo-700">
-          <span className="font-semibold">试一步：</span>
-          <MathText text={interactionPoint.question} />
-        </div>
-      )}
-
-      {isExpanded && submittedAttempt && branchType !== "mistake" && (
-        <div
-          className="mt-2 rounded-lg px-3 py-2.5 text-xs"
-          style={
-            submittedAttempt.isDirectionCorrect
-              ? {
-                  background: "#ecfdf5",
-                  color: "#047857",
-                }
-              : {
-                  background: "#fff7ed",
-                  color: "#c2410c",
-                }
-          }
-        >
-          {submittedAttempt.isDirectionCorrect ? "已在右侧完成这一步。" : "这一步曾偏离，先看右侧回正提示。"}
         </div>
       )}
 

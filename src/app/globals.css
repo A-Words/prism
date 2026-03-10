@@ -104,22 +104,35 @@
   .solution-step-node {
     padding: 16px 24px;
     border-radius: 16px;
-    background: white;
+    background: rgba(255, 255, 255, 0.98);
     border: 2px solid #e2e8f0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    box-shadow:
+      0 8px 20px rgba(15, 23, 42, 0.06),
+      0 2px 6px rgba(15, 23, 42, 0.04);
     max-width: 340px;
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   }
 
   .solution-step-node:hover {
     border-color: var(--color-primary-400);
-    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+    box-shadow:
+      0 12px 28px rgba(99, 102, 241, 0.16),
+      0 4px 12px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .solution-step-node[data-active="true"] {
+    box-shadow:
+      0 0 0 4px rgba(255, 255, 255, 0.96),
+      0 0 0 7px rgba(99, 102, 241, 0.16),
+      0 14px 32px rgba(99, 102, 241, 0.18),
+      0 6px 16px rgba(15, 23, 42, 0.08);
   }
 
   /* Node interaction states */
   .solution-step-node[data-state="locked"] {
-    opacity: 0.55;
-    filter: grayscale(0.3);
+    opacity: 0.72;
+    filter: grayscale(0.16);
   }
 
   .solution-step-node[data-state="hinted"] {
@@ -140,6 +153,14 @@
   .solution-step-node[data-branch="mistake"] {
     background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
     border-style: dashed;
+  }
+
+  .solution-step-node[data-branch="mistake"][data-active="true"] {
+    box-shadow:
+      0 0 0 4px rgba(255, 255, 255, 0.96),
+      0 0 0 7px rgba(249, 115, 22, 0.16),
+      0 14px 32px rgba(249, 115, 22, 0.18),
+      0 6px 16px rgba(15, 23, 42, 0.08);
   }
 
   /* Guide sidebar */
