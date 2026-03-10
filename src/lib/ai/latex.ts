@@ -170,6 +170,14 @@ export function normalizeSolutionPathLatex(path: SolutionPath): SolutionPath {
     ...path,
     problem: normalizeRenderableText(path.problem),
     summary: normalizeRenderableText(path.summary),
+    portrait: {
+      ...path.portrait,
+      problemType: normalizeRenderableText(path.portrait.problemType),
+      prerequisites: path.portrait.prerequisites.map((item) => ({
+        ...item,
+        why: normalizeRenderableText(item.why),
+      })),
+    },
     steps: path.steps.map((step) => ({
       ...step,
       title: normalizeRenderableText(step.title),
@@ -178,12 +186,21 @@ export function normalizeSolutionPathLatex(path: SolutionPath): SolutionPath {
       whyThisStep: normalizeOptionalText(step.whyThisStep),
       commonMistake: normalizeOptionalText(step.commonMistake),
       alternativeApproach: normalizeOptionalText(step.alternativeApproach),
+      branchRecoveryHint: normalizeOptionalText(step.branchRecoveryHint),
       interactionPoint: step.interactionPoint
         ? {
             ...step.interactionPoint,
             question: normalizeRenderableText(step.interactionPoint.question),
             options: step.interactionPoint.options?.map(normalizeRenderableText),
             hint: normalizeRenderableText(step.interactionPoint.hint),
+            correctOption: normalizeOptionalText(step.interactionPoint.correctOption),
+            correctFeedback: normalizeOptionalText(step.interactionPoint.correctFeedback),
+            wrongFeedback: normalizeOptionalText(step.interactionPoint.wrongFeedback),
+            recommendedLearningPathTargetId: step.interactionPoint.recommendedLearningPathTargetId,
+            recommendedRecoveryNodeId: step.interactionPoint.recommendedRecoveryNodeId,
+            recommendedLearnQuery: normalizeOptionalText(
+              step.interactionPoint.recommendedLearnQuery
+            ),
           }
         : undefined,
     })),

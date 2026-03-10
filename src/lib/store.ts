@@ -9,6 +9,7 @@ import type {
   LearningPathProgress,
   MasteryLevel,
   SolutionPath,
+  SolutionAttemptSession,
   StudentProgress,
 } from "@/types";
 import { getKnowledgeNode, knowledgeNodes } from "@/lib/knowledge-graph";
@@ -16,6 +17,7 @@ import {
   getDashboardLearningCards,
   getLearnHref,
   resolveMockLearningScenario,
+  resolveMockLearningScenarioForKnowledge,
 } from "@/lib/mock-data";
 import { scoreToMastery } from "@/lib/utils";
 import { DIAGNOSIS_STATUS_LABELS } from "@/types";
@@ -25,6 +27,7 @@ const defaultProgress: StudentProgress = {
   practiceHistory: [],
   learningPaths: [],
   diagnosisRecords: [],
+  solutionAttempts: [],
 };
 
 const OPEN_DIAGNOSIS_STATUSES: ReadonlySet<string> = new Set([
@@ -74,6 +77,7 @@ function ensureProgress(progress?: Partial<StudentProgress>): StudentProgress {
     practiceHistory: progress?.practiceHistory || [],
     learningPaths: progress?.learningPaths || [],
     diagnosisRecords: progress?.diagnosisRecords || [],
+    solutionAttempts: progress?.solutionAttempts || [],
   };
 }
 
@@ -132,6 +136,12 @@ function sortDiagnosisRecords(records: DiagnosisRecord[]) {
   });
 }
 
+function sortSolutionAttempts(sessions: SolutionAttemptSession[]) {
+  return [...sessions].sort(
+    (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
+  );
+}
+
 function getRecoveryNodeIds(record: DiagnosisRecord) {
   return [
     ...(record.diagnosis.prerequisitesToFix || []).map((item) => item.id),
@@ -140,7 +150,12 @@ function getRecoveryNodeIds(record: DiagnosisRecord) {
 }
 
 function getPlanNodeMinutes(targetId: string, nodeId?: string) {
-  const scenario = resolveMockLearningScenario({ targetId });
+  const scenario =
+    resolveMockLearningScenario({ targetId }) ||
+    resolveMockLearningScenarioForKnowledge({ knowledgeId: targetId });
+  if (!scenario) {
+    return 12;
+  }
   const plan = scenario.plan;
   const targetNodeId =
     nodeId || plan.recommendedStartId || plan.nodes[0]?.knowledgeId;
@@ -265,6 +280,9 @@ export const useAppStore = create<AppState>()(
         const scenario = diagnosis.recommendedLearnTargetId
           ? resolveMockLearningScenario({
               targetId: diagnosis.recommendedLearnTargetId,
+            }) ||
+            resolveMockLearningScenarioForKnowledge({
+              knowledgeId: diagnosis.recommendedLearnTargetId,
               query: diagnosis.recommendedLearnQuery,
             })
           : null;
@@ -419,10 +437,17 @@ export const useAppStore = create<AppState>()(
           return undefined;
         }
 
-        const scenario = resolveMockLearningScenario({
-          targetId: record.recommendedTargetId,
-          query: record.recommendedQuery,
-        });
+        const scenario =
+          resolveMockLearningScenario({
+            targetId: record.recommendedTargetId,
+          }) ||
+          resolveMockLearningScenarioForKnowledge({
+            knowledgeId: record.recommendedTargetId,
+            query: record.recommendedQuery,
+          });
+        if (!scenario) {
+          return undefined;
+        }
         const recoveryNodeId =
           record.recoveryNodeId ||
           record.recommendedTargetId ||
@@ -495,6 +520,130 @@ export const useAppStore = create<AppState>()(
         return href;
       },
 
+      upsertSolutionAttemptSession: (session) => {
+        set((state) => {
+          const progress = ensureProgress(state.progress);
+          const nextSessions = progress.solutionAttempts.some(
+            (item) => item.problemKey === session.problemKey
+          )
+            ? progress.solutionAttempts.map((item) =>
+                item.problemKey === session.problemKey ? session : item
+              )
+            : [...progress.solutionAttempts, session];
+
+          return {
+            progress: {
+              ...progress,
+              solutionAttempts: sortSolutionAttempts(nextSessions),
+            },
+          };
+        });
+      },
+
+      startSolutionRecovery: ({
+        problemKey,
+        knowledgeIds,
+        recommendedLearningPathTargetId,
+        recommendedRecoveryNodeId,
+        recommendedLearnTargetId,
+        recommendedLearnQuery,
+      }) => {
+        const progress = ensureProgress(get().progress);
+        const fallbackKnowledgeId = knowledgeIds[0];
+        const targetScenario =
+          (recommendedLearningPathTargetId
+            ? resolveMockLearningScenario({ targetId: recommendedLearningPathTargetId })
+            : undefined) ||
+          (recommendedLearnTargetId
+            ? resolveMockLearningScenario({ targetId: recommendedLearnTargetId })
+            : undefined) ||
+          (fallbackKnowledgeId
+            ? resolveMockLearningScenarioForKnowledge({
+                knowledgeId: fallbackKnowledgeId,
+                query: recommendedLearnQuery,
+              })
+            : undefined);
+        if (!targetScenario) {
+          return undefined;
+        }
+
+        const scenario = targetScenario;
+        const recoveryNodeCandidate =
+          recommendedRecoveryNodeId ||
+          (recommendedLearningPathTargetId &&
+          recommendedLearningPathTargetId !== scenario.targetId
+            ? recommendedLearningPathTargetId
+            : undefined) ||
+          (recommendedLearnTargetId &&
+          recommendedLearnTargetId !== scenario.targetId
+            ? recommendedLearnTargetId
+            : undefined) ||
+          fallbackKnowledgeId;
+        const recoveryNodeId =
+          scenario.plan.nodes.find(
+            (node) => node.knowledgeId === recoveryNodeCandidate
+          )?.knowledgeId ||
+          scenario.plan.recommendedStartId ||
+          scenario.plan.nodes[0]?.knowledgeId;
+        const recoveryIndex = Math.max(
+          0,
+          scenario.plan.nodes.findIndex(
+            (node) => node.knowledgeId === recoveryNodeId
+          )
+        );
+        const completedNodeIds = scenario.plan.nodes
+          .slice(0, recoveryIndex)
+          .map((node) => node.knowledgeId);
+        const now = new Date().toISOString();
+        const href = getLearnHref(
+          scenario.targetId,
+          recommendedLearnQuery || scenario.title
+        );
+
+        set((state) => {
+          const currentProgress = applyMasteryUpdates(
+            ensureProgress(state.progress),
+            knowledgeIds,
+            false,
+            now
+          );
+          const existingPath = currentProgress.learningPaths.find(
+            (item) => item.targetId === scenario.targetId
+          );
+          const nextPath: LearningPathProgress = {
+            targetId: scenario.targetId,
+            targetName:
+              existingPath?.targetName ||
+              getKnowledgeNode(scenario.targetId)?.name ||
+              scenario.dashboardTitle,
+            currentNodeId: recoveryNodeId,
+            currentStep: recoveryIndex + 1,
+            totalSteps: scenario.plan.nodes.length,
+            completedNodeIds,
+            startedAt: existingPath?.startedAt || now,
+            updatedAt: now,
+            status: "active",
+            activeDiagnosisQuestionId: existingPath?.activeDiagnosisQuestionId,
+            activeSolveProblemKey: problemKey,
+          };
+
+          const nextLearningPaths = existingPath
+            ? currentProgress.learningPaths.map((item) =>
+                item.targetId === scenario.targetId ? nextPath : item
+              )
+            : [...currentProgress.learningPaths, nextPath];
+
+          return {
+            progress: {
+              ...currentProgress,
+              learningPaths: nextLearningPaths,
+            },
+          };
+        });
+
+        return href;
+      },
+
       getMastery: (nodeId: string) => {
         const k = ensureProgress(get().progress).knowledge[nodeId];
         return k?.mastery || "none";
@@ -519,7 +668,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "prism-student-progress",
-      version: 2,
+      version: 3,
       migrate: (persistedState) => {
         if (
           persistedState &&
@@ -640,7 +789,12 @@ export function getDailyRecommendation(
     .reverse()
     .find((path) => path.status === "active");
   if (activePath) {
-    const scenario = resolveMockLearningScenario({ targetId: activePath.targetId });
+    const scenario =
+      resolveMockLearningScenario({ targetId: activePath.targetId }) ||
+      resolveMockLearningScenarioForKnowledge({
+        knowledgeId: activePath.targetId,
+        query: activePath.targetName,
+      });
     const currentNodeName =
       getKnowledgeNode(activePath.currentNodeId)?.name || activePath.currentNodeId;
     tasks.push({
@@ -651,7 +805,7 @@ export function getDailyRecommendation(
       detail: activePath.activeDiagnosisQuestionId ? "由最近诊断触发回补" : "接着上次继续",
       href: getLearnHref(activePath.targetId, activePath.targetName),
       estimatedMinutes: getPlanNodeMinutes(
-        scenario.targetId,
+        scenario?.targetId || activePath.targetId,
         activePath.currentNodeId
       ),
       priority: 1,
@@ -660,7 +814,15 @@ export function getDailyRecommendation(
 
   const weakPoints = getWeakPoints(safeProgress);
   const weakRecommendations = weakPoints.slice(0, 2).map((weak) => {
-    const scenario = resolveMockLearningScenario({ targetId: weak.nodeId });
+    const scenario =
+      resolveMockLearningScenario({ targetId: weak.nodeId }) ||
+      resolveMockLearningScenarioForKnowledge({
+        knowledgeId: weak.nodeId,
+        query: weak.nodeName,
+      });
+    if (!scenario) {
+      return null;
+    }
     const estimatedMinutes = getPlanNodeMinutes(
       scenario.targetId,
       scenario.plan.recommendedStartId
@@ -672,7 +834,17 @@ export function getDailyRecommendation(
       href: getLearnHref(scenario.targetId, scenario.title),
       estimatedMinutes,
     };
-  });
+  }).filter(
+    (
+      item
+    ): item is {
+      id: string;
+      name: string;
+      reason: string;
+      href: string;
+      estimatedMinutes: number;
+    } => Boolean(item)
+  );
 
   const usedRecommendationIds = new Set(
     tasks

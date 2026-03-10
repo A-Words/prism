@@ -16,6 +16,10 @@ type TemplateId =
   | "ellipse"
   | "generic";
 
+type RuleSolutionPathDraft = Omit<SolutionPath, "portrait"> & {
+  portrait?: SolutionPath["portrait"];
+};
+
 const VALID_STEP_TYPES = new Set([
   "analysis",
   "strategy",
@@ -27,14 +31,6 @@ const VALID_STEP_TYPES = new Set([
 
 function unique<T>(items: T[]) {
   return [...new Set(items)];
-}
-
-function createLinearEdges(steps: SolutionStep[]) {
-  return steps.slice(0, -1).map((step, index) => ({
-    source: step.id,
-    target: steps[index + 1].id,
-    label: index === 0 ? "明确题型后" : "继续推进",
-  }));
 }
 
 function buildGuide(
@@ -58,6 +54,467 @@ function buildGuide(
       })),
     commonMistakes,
     stepHints,
+  };
+}
+
+const INTERACTION_OVERRIDES: Partial<
+  Record<
+    TemplateId,
+    Record<
+      string,
+      {
+        correctOption?: string;
+        question?: string;
+        options?: string[];
+        hint?: string;
+        correctFeedback?: string;
+        wrongFeedback?: string;
+        recommendedLearningPathTargetId?: string;
+        recommendedRecoveryNodeId?: string;
+        recommendedLearnTargetId?: string;
+        recommendedLearnQuery?: string;
+        mistakeKnowledgeId?: string;
+      }
+    >
+  >
+> = {
+  "quadratic-inequality": {
+    s1: {
+      question: "看到这个式子，第一步最该确认什么？",
+      options: ["先因式分解", "先判断题型和目标", "先代几个值试试"],
+      hint: "先确认它是一元二次不等式，目标是求解集而不是单个根。",
+      correctOption: "先判断题型和目标",
+      correctFeedback: "先把题型和目标看准，后面动作才不会跑偏。",
+      wrongFeedback: "这一步先别急着算，先确认它是解不等式而不是解方程。",
+      recommendedLearningPathTargetId: "function-quadratic",
+      recommendedRecoveryNodeId: "inequality-basic",
+      recommendedLearnTargetId: "inequality-basic",
+      recommendedLearnQuery: "一元二次不等式总把解集和根混掉",
+      mistakeKnowledgeId: "inequality-basic",
+    },
+    s2: {
+      question: "这道题最稳的主策略是什么？",
+      options: ["先求根再看图像", "直接背口诀写区间", "先随便代入几个值"],
+      hint: "先找临界点，再用开口方向决定区间符号。",
+      correctOption: "先求根再看图像",
+      correctFeedback: "先找临界点再看开口方向，是这类题最稳的主线。",
+      wrongFeedback: "直接背口诀或硬代值会让你失去区间判断的抓手。",
+      recommendedLearningPathTargetId: "function-quadratic",
+      recommendedRecoveryNodeId: "function-quadratic",
+      recommendedLearnTargetId: "function-quadratic",
+      recommendedLearnQuery: "二次函数图像和区间符号总连不起来",
+      mistakeKnowledgeId: "function-quadratic",
+    },
+    s3: {
+      question: "两个根会把数轴切成几段？",
+      options: ["2 段", "3 段", "4 段"],
+      hint: "两个临界点会把数轴切成左边、中间、右边三段。",
+      correctOption: "3 段",
+      correctFeedback: "两个临界点会把数轴切成三段，这是后面判断符号的底座。",
+      wrongFeedback: "先把根和数轴分段连起来，别把求根停成孤立计算。",
+      recommendedLearningPathTargetId: "function-quadratic",
+      recommendedRecoveryNodeId: "function-zero",
+      recommendedLearnTargetId: "function-zero",
+      recommendedLearnQuery: "求根后总不会接数轴分段",
+      mistakeKnowledgeId: "function-zero",
+    },
+    s5: {
+      question: "如果原题改成 $\\le 0$，解集会怎么变？",
+      options: ["仍是 $(1, 2)$", "变成 $[1, 2]$", "变成 $(1, 2]$"],
+      hint: "含等号时，端点也满足条件，所以边界会并进去。",
+      correctOption: "变成 $[1, 2]$",
+      correctFeedback: "边界是否可取只由不等号是否含等号决定。",
+      wrongFeedback: "最后一步别凭感觉，回到原不等号重新检查边界。",
+      recommendedLearningPathTargetId: "set-operations",
+      recommendedRecoveryNodeId: "set-operations",
+      recommendedLearnTargetId: "set-operations",
+      recommendedLearnQuery: "区间边界和集合表达总写错",
+      mistakeKnowledgeId: "set-operations",
+    },
+  },
+  domain: {
+    s1: {
+      question: "定义域题最稳的起手动作是什么？",
+      options: ["先整体硬算", "先逐块列合法条件", "先猜答案区间"],
+      hint: "定义域题要先对每一部分分别列条件，再统一合并。",
+      correctOption: "先逐块列合法条件",
+      correctFeedback: "先逐块列条件，后面的交集才有依据。",
+      wrongFeedback: "如果先整体硬算，最容易漏掉某一部分的合法性约束。",
+      recommendedLearningPathTargetId: "function-logarithmic",
+      recommendedRecoveryNodeId: "function-concept",
+      recommendedLearnTargetId: "function-concept",
+      recommendedLearnQuery: "定义域题不知道先列条件还是先算",
+      mistakeKnowledgeId: "function-concept",
+    },
+    s3: {
+      question: "把条件列出来以后，下一步最该做什么？",
+      options: ["直接写答案", "统一成区间再取交集", "只保留最严格的一个条件"],
+      hint: "定义域题不是挑一个条件，而是把所有条件统一后取交集。",
+      correctOption: "统一成区间再取交集",
+      correctFeedback: "条件要先统一成区间，最后才能稳定做交集。",
+      wrongFeedback: "定义域题别停在零散条件上，要把它们统一成区间再合并。",
+      recommendedLearningPathTargetId: "function-logarithmic",
+      recommendedRecoveryNodeId: "inequality-basic",
+      recommendedLearnTargetId: "function-logarithmic",
+      recommendedLearnQuery: "定义域题总在列条件和取交集时出错",
+      mistakeKnowledgeId: "inequality-basic",
+    },
+  },
+  "trig-transform": {
+    s1: {
+      question: "三角题一上来最该先看什么？",
+      options: ["直接背一条熟悉公式", "先看已知量和目标量", "先设很多中间量"],
+      hint: "先看已知什么、求什么，才能知道哪条公式路径最短。",
+      correctOption: "先看已知量和目标量",
+      correctFeedback: "先看已知量和目标量，公式选路会清晰很多。",
+      wrongFeedback: "公式多不怕，怕的是没先看清条件和目标就乱套。",
+      recommendedLearningPathTargetId: "trig-transform",
+      recommendedRecoveryNodeId: "trig-transform",
+      recommendedLearnTargetId: "trig-transform",
+      recommendedLearnQuery: "三角恒等变换总会一上来乱套公式",
+      mistakeKnowledgeId: "trig-transform",
+    },
+    s2: {
+      question: "当已知量和目标量已经明确后，下一步最稳的动作是什么？",
+      options: ["优先选最短公式路径", "把所有公式都试一遍", "先求出所有三角函数值"],
+      hint: "优先选能直接把已知量送到目标量的公式，绕路越少越稳。",
+      correctOption: "优先选最短公式路径",
+      correctFeedback: "先看已知量和目标量，能直接连起来的公式优先。",
+      wrongFeedback: "三角题一上来乱切公式，通常就是从这一步开始偏。",
+      recommendedLearningPathTargetId: "trig-transform",
+      recommendedRecoveryNodeId: "trig-transform",
+      recommendedLearnTargetId: "trig-transform",
+      recommendedLearnQuery: "三角恒等变换总会选错公式",
+      mistakeKnowledgeId: "trig-transform",
+    },
+  },
+  "conditional-probability": {
+    s1: {
+      question: "条件概率题先要分清什么？",
+      options: ["目标事件和条件事件", "先把答案写成分数", "先套公式再解释"],
+      hint: "先分清“求谁”和“已知谁”，样本空间才不会看错。",
+      correctOption: "目标事件和条件事件",
+      correctFeedback: "先把目标事件和条件事件分清，条件概率的入口就稳了。",
+      wrongFeedback: "如果事件关系没拆开，后面的公式看起来对，实际会数错东西。",
+      recommendedLearningPathTargetId: "prob-conditional",
+      recommendedRecoveryNodeId: "prob-conditional",
+      recommendedLearnTargetId: "prob-conditional",
+      recommendedLearnQuery: "条件概率总分不清条件事件和目标事件",
+      mistakeKnowledgeId: "prob-conditional",
+    },
+    s2: {
+      question: "条件事件出现后，样本空间应该怎么处理？",
+      options: ["保持原样不变", "重建为条件下的新样本空间", "只改分子不改分母"],
+      hint: "条件概率的分母本质上就是条件事件对应的新观察范围。",
+      correctOption: "重建为条件下的新样本空间",
+      correctFeedback: "条件概率先缩小样本空间，方向就立住了。",
+      wrongFeedback: "如果还在原样本空间里硬算，后面分子分母都会乱。",
+      recommendedLearningPathTargetId: "prob-conditional",
+      recommendedRecoveryNodeId: "prob-conditional",
+      recommendedLearnTargetId: "prob-conditional",
+      recommendedLearnQuery: "条件概率总把样本空间看错",
+      mistakeKnowledgeId: "prob-conditional",
+    },
+  },
+  sequence: {
+    s1: {
+      question: "等差数列题一开始最该看什么？",
+      options: ["先看已知项和目标项的下标关系", "先背通项公式", "先猜公差大小"],
+      hint: "先把第几项、求第几项和相差几段公差看清楚。",
+      correctOption: "先看已知项和目标项的下标关系",
+      correctFeedback: "先把下标关系看清，后面公差和目标项才不会一起偏。",
+      wrongFeedback: "等差数列常见翻车点不是公式不会，而是下标差没看准。",
+      recommendedLearningPathTargetId: "seq-arithmetic",
+      recommendedRecoveryNodeId: "seq-concept",
+      recommendedLearnTargetId: "seq-arithmetic",
+      recommendedLearnQuery: "等差数列总把第几项和公差段数看混",
+      mistakeKnowledgeId: "seq-arithmetic",
+    },
+    s2: {
+      question: "确定它是等差数列后，下一步最稳的动作是什么？",
+      options: ["先抓固定步长关系", "直接代目标项", "先列前 n 项和"],
+      hint: "先用固定步长建立公差关系，再去回推目标项。",
+      correctOption: "先抓固定步长关系",
+      correctFeedback: "先抓固定步长，再回到通项，是等差数列最稳的节奏。",
+      wrongFeedback: "下标差没看准时，后面的公差和目标项都会一起偏掉。",
+      recommendedLearningPathTargetId: "seq-arithmetic",
+      recommendedRecoveryNodeId: "seq-arithmetic",
+      recommendedLearnTargetId: "seq-arithmetic",
+      recommendedLearnQuery: "等差数列总把下标差看错",
+      mistakeKnowledgeId: "seq-arithmetic",
+    },
+  },
+  ellipse: {
+    s1: {
+      question: "椭圆题看到题目后，第一步最该判断什么？",
+      options: ["直接联立方程", "先判断入口是定义、标准式还是焦点信息", "先把所有点坐标写出来"],
+      hint: "椭圆题的关键是先判断入口，不是默认联立硬算。",
+      correctOption: "先判断入口是定义、标准式还是焦点信息",
+      correctFeedback: "先判断入口是标准式、定义还是焦点信息，比直接联立更稳。",
+      wrongFeedback: "椭圆题一上来就硬算，通常会把本可直接用的定义浪费掉。",
+      recommendedLearningPathTargetId: "analytic-ellipse",
+      recommendedRecoveryNodeId: "analytic-ellipse",
+      recommendedLearnTargetId: "analytic-ellipse",
+      recommendedLearnQuery: "椭圆题总是找不到入口",
+      mistakeKnowledgeId: "analytic-ellipse",
+    },
+  },
+  generic: {
+    s1: {
+      question: "遇到陌生数学题时，第一步最稳的动作是什么？",
+      options: ["先判断题型和目标", "先开始算", "先写最终答案的形式"],
+      hint: "题型和目标决定后面该走哪条主线，先立方向再推进。",
+      correctOption: "先判断题型和目标",
+      correctFeedback: "先定题型和目标，才不会边算边改方向。",
+      wrongFeedback: "不先定方向就开算，通常会把约束和主方法一起漏掉。",
+      recommendedLearningPathTargetId: "function-quadratic",
+      recommendedRecoveryNodeId: "function-concept",
+      recommendedLearnTargetId: "function-concept",
+      recommendedLearnQuery: "做题总是一上来就乱算",
+      mistakeKnowledgeId: "function-concept",
+    },
+  },
+};
+
+function buildPortrait(
+  problemType: string,
+  difficulty: 1 | 2 | 3 | 4 | 5,
+  knowledgeIds: string[],
+  guide?: ProblemGuide
+): SolutionPath["portrait"] {
+  const uniqueKnowledge = unique(knowledgeIds)
+    .map((id) => getKnowledgeNode(id))
+    .filter((node): node is NonNullable<typeof node> => Boolean(node));
+
+  return {
+    stage: "高中数学",
+    problemType,
+    difficulty,
+    knowledgePoints: uniqueKnowledge.slice(0, 4).map((node) => ({
+      id: node.id,
+      name: node.name,
+      category: node.category,
+    })),
+    prerequisites:
+      guide?.prerequisites?.length
+        ? guide.prerequisites.slice(0, 4)
+        : uniqueKnowledge.slice(0, 3).map((node) => ({
+            id: node.id,
+            name: node.name,
+            why: `这道题会调用 ${node.name} 的基础判断动作。`,
+          })),
+  };
+}
+
+function enrichRuleInteractions(template: TemplateId, steps: SolutionStep[]) {
+  const overrides = INTERACTION_OVERRIDES[template] || {};
+  return steps.map((step) => {
+    const override = overrides[step.id];
+    const interaction = step.interactionPoint || (override
+      ? {
+          question: override.question || "",
+          options: override.options,
+          hint: override.hint || "",
+        }
+      : undefined);
+    if (!interaction) {
+      return {
+        ...step,
+        branchType: step.branchType || "main",
+      };
+    }
+
+    return {
+      ...step,
+      branchType: step.branchType || "main",
+      interactionPoint: {
+        ...interaction,
+        question: interaction.question || override?.question || step.title,
+        options: interaction.options || override?.options,
+        hint:
+          interaction.hint ||
+          override?.hint ||
+          "先回到当前节点的关键判断，不要直接跳到后面的运算。",
+        correctOption:
+          interaction.correctOption || override?.correctOption,
+        correctFeedback:
+          interaction.correctFeedback ||
+          override?.correctFeedback ||
+          "方向是对的，继续沿当前主线推进。",
+        wrongFeedback:
+          interaction.wrongFeedback ||
+          override?.wrongFeedback ||
+          "这一步已经偏离主线了，先回看当前节点的关键判断。",
+        recommendedLearningPathTargetId:
+          interaction.recommendedLearningPathTargetId ||
+          override?.recommendedLearningPathTargetId ||
+          interaction.recommendedLearnTargetId,
+        recommendedRecoveryNodeId:
+          interaction.recommendedRecoveryNodeId ||
+          override?.recommendedRecoveryNodeId ||
+          interaction.mistakeKnowledgeId ||
+          override?.mistakeKnowledgeId ||
+          step.knowledgePoints[0],
+        recommendedLearnTargetId:
+          interaction.recommendedLearnTargetId ||
+          override?.recommendedLearnTargetId ||
+          step.knowledgePoints[0],
+        recommendedLearnQuery:
+          interaction.recommendedLearnQuery ||
+          override?.recommendedLearnQuery,
+        mistakeKnowledgeId:
+          interaction.mistakeKnowledgeId ||
+          override?.mistakeKnowledgeId ||
+          step.knowledgePoints[0],
+      },
+    } satisfies SolutionStep;
+  });
+}
+
+function createSolutionEdges(steps: SolutionStep[]) {
+  const mainSteps = steps.filter((step) => step.branchType !== "mistake");
+  const mistakeSteps = steps.filter((step) => step.branchType === "mistake");
+
+  const mainEdges = mainSteps.slice(0, -1).map((step, index) => ({
+    source: step.id,
+    target: mainSteps[index + 1].id,
+    label: index === 0 ? "明确题型后" : "继续推进",
+    type: "main" as const,
+  }));
+
+  const branchEdges = mistakeSteps.flatMap((step) => {
+    if (!step.branchFromStepId) {
+      return [];
+    }
+    return [
+      {
+        source: step.branchFromStepId,
+        target: step.id,
+        label: "若方向偏离",
+        type: "mistake_branch" as const,
+      },
+      {
+        source: step.id,
+        target: step.branchFromStepId,
+        label: "回到主线",
+        type: "return_main" as const,
+      },
+    ];
+  });
+
+  return [...mainEdges, ...branchEdges];
+}
+
+function attachMistakeBranches(
+  steps: SolutionStep[],
+  guide?: ProblemGuide
+) {
+  const mainSteps = steps.map((step) => ({
+    ...step,
+    branchType: step.branchType || "main",
+  }));
+  const existingBranchSteps = mainSteps.filter(
+    (step) => step.branchType === "mistake"
+  );
+
+  if (existingBranchSteps.length >= 2) {
+    return {
+      steps: mainSteps,
+      edges: createSolutionEdges(mainSteps),
+    };
+  }
+
+  const branchCandidates = mainSteps
+    .filter(
+      (step) =>
+        step.branchType !== "mistake" &&
+        step.commonMistake &&
+        step.interactionPoint
+    )
+    .slice(0, Math.max(2, 2 - existingBranchSteps.length) + existingBranchSteps.length);
+
+  const branchSteps = branchCandidates
+    .filter(
+      (step) =>
+        !mainSteps.some(
+          (item) =>
+            item.branchType === "mistake" &&
+            item.branchFromStepId === step.id
+        )
+    )
+    .slice(0, 2)
+    .map((step, index) => {
+      const branchId = `${step.id}-mistake-${index + 1}`;
+      const recoveryHint =
+        step.branchRecoveryHint ||
+        step.interactionPoint?.wrongFeedback ||
+        `先回到「${step.title}」，把关键判断重新站稳，再继续主线。`;
+
+      return {
+        id: branchId,
+        title: `易错分支：${step.title}`,
+        content: `如果在这一步直接${step.commonMistake}，主线会从这里开始偏掉。`,
+        explanation: `偏离原因：${step.commonMistake}`,
+        knowledgePoints: [
+          step.interactionPoint?.mistakeKnowledgeId || step.knowledgePoints[0],
+        ].filter(Boolean),
+        type: step.type,
+        branchType: "mistake" as const,
+        branchFromStepId: step.id,
+        branchRecoveryHint: recoveryHint,
+        whyThisStep: `这是一条高频错误路线，用来提醒你这一步最容易偏在哪里。`,
+      } satisfies SolutionStep;
+    });
+
+  const allSteps = mainSteps
+    .map((step) => {
+      const branchStep = branchSteps.find(
+        (item) => item.branchFromStepId === step.id
+      );
+      return branchStep && step.interactionPoint
+        ? {
+            ...step,
+            interactionPoint: {
+              ...step.interactionPoint,
+              branchStepId: branchStep.id,
+            },
+          }
+        : step;
+    })
+    .concat(branchSteps);
+
+  return {
+    steps: allSteps,
+    edges: createSolutionEdges(allSteps),
+  };
+}
+
+function finalizeSolutionPath(
+  path: Omit<SolutionPath, "edges" | "portrait"> & {
+    portrait?: SolutionPath["portrait"];
+    edges?: SolutionPath["edges"];
+  },
+  template: TemplateId
+): SolutionPath {
+  const enrichedSteps = enrichRuleInteractions(template, path.steps);
+  const withBranches = attachMistakeBranches(enrichedSteps, path.guide);
+  const portrait =
+    path.portrait ||
+    buildPortrait(
+      path.problemType,
+      path.difficulty,
+      unique([
+        ...path.relatedKnowledge,
+        ...withBranches.steps.flatMap((step) => step.knowledgePoints),
+      ]),
+      path.guide
+    );
+
+  return {
+    ...path,
+    portrait,
+    steps: withBranches.steps,
+    edges: path.edges?.length ? path.edges : withBranches.edges,
   };
 }
 
@@ -88,7 +545,10 @@ function detectTemplate(problem: string): TemplateId {
   return "generic";
 }
 
-function buildRuleSolutionPath(problem: string, template: TemplateId): SolutionPath {
+function buildRuleSolutionPath(
+  problem: string,
+  template: TemplateId
+): RuleSolutionPathDraft {
   switch (template) {
     case "quadratic-inequality":
       return {
@@ -711,6 +1171,41 @@ function sanitizeDifficulty(value: number | undefined, fallback: number) {
   return fallback as 1 | 2 | 3 | 4 | 5;
 }
 
+function normalizePortrait(
+  raw: SolutionPath["portrait"] | undefined,
+  fallback: SolutionPath["portrait"]
+) {
+  if (!raw) {
+    return fallback;
+  }
+
+  return {
+    stage: raw.stage?.trim() || fallback.stage,
+    problemType: raw.problemType?.trim() || fallback.problemType,
+    difficulty: sanitizeDifficulty(raw.difficulty, fallback.difficulty),
+    knowledgePoints:
+      raw.knowledgePoints?.length
+        ? raw.knowledgePoints
+            .filter((item) => item.id && item.name)
+            .slice(0, 4)
+            .map((item) => {
+              const node = getKnowledgeNode(item.id);
+              return {
+                id: item.id,
+                name: item.name,
+                category: node?.category || fallback.knowledgePoints[0]?.category || "algebra",
+              };
+            })
+        : fallback.knowledgePoints,
+    prerequisites:
+      raw.prerequisites?.length
+        ? raw.prerequisites
+            .filter((item) => item.id && item.name && item.why)
+            .slice(0, 4)
+        : fallback.prerequisites,
+  };
+}
+
 function normalizeGuide(raw: SolutionPath["guide"], fallback: ProblemGuide) {
   if (!raw) {
     return fallback;
@@ -742,7 +1237,7 @@ function normalizeSolutionPath(
   problem: string
 ): SolutionPath {
   const steps = raw.steps
-    .slice(0, 8)
+    .slice(0, 12)
     .map((step, index) => {
       const fallbackStep = fallback.steps[Math.min(index, fallback.steps.length - 1)];
       return {
@@ -759,31 +1254,70 @@ function normalizeSolutionPath(
         commonMistake: step.commonMistake?.trim() || fallbackStep.commonMistake,
         alternativeApproach:
           step.alternativeApproach?.trim() || fallbackStep.alternativeApproach,
-        interactionPoint: step.interactionPoint,
+        interactionPoint: step.interactionPoint
+          ? {
+              ...step.interactionPoint,
+              correctOption:
+                step.interactionPoint.correctOption?.trim() ||
+                fallbackStep.interactionPoint?.correctOption,
+              correctFeedback:
+                step.interactionPoint.correctFeedback?.trim() ||
+                fallbackStep.interactionPoint?.correctFeedback,
+              wrongFeedback:
+                step.interactionPoint.wrongFeedback?.trim() ||
+                fallbackStep.interactionPoint?.wrongFeedback,
+              mistakeKnowledgeId:
+                step.interactionPoint.mistakeKnowledgeId?.trim() ||
+                fallbackStep.interactionPoint?.mistakeKnowledgeId,
+              recommendedLearningPathTargetId:
+                step.interactionPoint.recommendedLearningPathTargetId?.trim() ||
+                fallbackStep.interactionPoint?.recommendedLearningPathTargetId,
+              recommendedRecoveryNodeId:
+                step.interactionPoint.recommendedRecoveryNodeId?.trim() ||
+                fallbackStep.interactionPoint?.recommendedRecoveryNodeId,
+              recommendedLearnTargetId:
+                step.interactionPoint.recommendedLearnTargetId?.trim() ||
+                fallbackStep.interactionPoint?.recommendedLearnTargetId,
+              recommendedLearnQuery:
+                step.interactionPoint.recommendedLearnQuery?.trim() ||
+                fallbackStep.interactionPoint?.recommendedLearnQuery,
+              branchStepId:
+                step.interactionPoint.branchStepId?.trim() ||
+                fallbackStep.interactionPoint?.branchStepId,
+            }
+          : fallbackStep.interactionPoint,
+        branchType: step.branchType || fallbackStep.branchType || "main",
+        branchFromStepId:
+          step.branchFromStepId?.trim() || fallbackStep.branchFromStepId,
+        branchRecoveryHint:
+          step.branchRecoveryHint?.trim() || fallbackStep.branchRecoveryHint,
       } satisfies SolutionStep;
     })
     .filter((step) => step.title && step.content && step.explanation);
 
-  if (steps.length < 5) {
-    return {
-      ...fallback,
-      edges: createLinearEdges(fallback.steps),
-    };
+  const mainStepCount = steps.filter((step) => step.branchType !== "mistake").length;
+
+  if (mainStepCount < 5) {
+    return fallback;
   }
 
-  return solutionPathSchema.parse({
+  return finalizeSolutionPath(
+    solutionPathSchema.parse({
     problem,
     problemType: raw.problemType?.trim() || fallback.problemType,
     difficulty: sanitizeDifficulty(raw.difficulty, fallback.difficulty),
+    portrait: normalizePortrait(raw.portrait, fallback.portrait),
     steps,
-    edges: createLinearEdges(steps),
+    edges: createSolutionEdges(steps),
     summary: raw.summary?.trim() || fallback.summary,
     relatedKnowledge: unique([
       ...sanitizeKnowledgePoints(raw.relatedKnowledge || [], fallback.relatedKnowledge),
       ...steps.flatMap((step) => step.knowledgePoints),
     ]),
     guide: normalizeGuide(raw.guide, fallback.guide || fallback.guide!),
-  });
+    }),
+    detectTemplate(problem)
+  );
 }
 
 async function tryGenerateAiSolution(
@@ -807,9 +1341,10 @@ async function tryGenerateAiSolution(
     await provider.generateStructured({
       system: [
         "你是高中数学解题路径助手。",
-        "请输出 5 到 8 个面向学生的思维节点，不要直接给整篇长解。",
+        "请输出 5 到 8 个主干思维节点，并补充至少 2 个易错分支节点。",
         "知识点 ID 必须来自给定知识图谱；如果不确定，优先使用更通用的已知 ID。",
-        "必须包含题型说明、前置知识、易错点和递进提示。",
+        "必须包含结构化题目画像、前置知识、易错点、递进提示，以及可判方向的互动点。",
+        "学生模式只反馈方向是否正确和简短提示，不直接给标准答案。",
         "涉及公式时优先使用 $...$ 或 $$...$$；如果偶尔输出裸 LaTeX 命令，系统会兼容处理。",
       ].join("\n"),
       prompt: [
@@ -820,6 +1355,7 @@ async function tryGenerateAiSolution(
         focusedKnowledgeContext,
         "",
         "请生成适合学生模式的解题路径，避免直接输出完整标准答案。",
+        "必须返回 portrait，steps 中主干节点 branchType=main，易错分支节点 branchType=mistake，edges 会由系统补全。",
       ].join("\n"),
       schema: solutionPathAiSchema,
       temperature: 0.35,
@@ -839,11 +1375,14 @@ async function tryGenerateAiSolution(
 
 export async function generateSolutionPath(input: GenerateSolutionPathInput) {
   const template = detectTemplate(input.problem);
-  const fallback = buildRuleSolutionPath(input.problem, template);
+  const fallback = finalizeSolutionPath(
+    buildRuleSolutionPath(input.problem, template),
+    template
+  );
   const rulePath = normalizeSolutionPathLatex(
     solutionPathSchema.parse({
-    ...fallback,
-    edges: createLinearEdges(fallback.steps),
+      ...fallback,
+      edges: createSolutionEdges(fallback.steps),
     })
   );
 

@@ -46,13 +46,41 @@ export type SolutionStepType =
   | "conclusion";   // 得出结论
 
 /** 解题节点的交互状态 */
-export type SolutionStepState = "locked" | "hinted" | "attempted";
+export type SolutionStepState = "locked" | "hinted" | "attempted" | "offtrack";
+
+export type SolutionBranchType = "main" | "mistake";
+export type SolutionEdgeType = "main" | "mistake_branch" | "return_main";
+
+export interface SolutionPortrait {
+  stage: string;
+  problemType: string;
+  difficulty: 1 | 2 | 3 | 4 | 5;
+  knowledgePoints: {
+    id: string;
+    name: string;
+    category: KnowledgeCategory;
+  }[];
+  prerequisites: {
+    id: string;
+    name: string;
+    why: string;
+  }[];
+}
 
 /** 节点内嵌的互动提问 */
 export interface InteractionPoint {
   question: string;       // "下一步你会先判断什么？"
   options?: string[];     // 可选：选择题
   hint: string;           // 尝试后揭示的提示
+  correctOption?: string;
+  correctFeedback?: string;
+  wrongFeedback?: string;
+  mistakeKnowledgeId?: string;
+  recommendedLearningPathTargetId?: string;
+  recommendedRecoveryNodeId?: string;
+  recommendedLearnTargetId?: string;
+  recommendedLearnQuery?: string;
+  branchStepId?: string;
 }
 
 export interface SolutionStep {
@@ -70,12 +98,16 @@ export interface SolutionStep {
   alternativeApproach?: string;
   /** 节点内互动点 */
   interactionPoint?: InteractionPoint;
+  branchType?: SolutionBranchType;
+  branchFromStepId?: string;
+  branchRecoveryHint?: string;
 }
 
 export interface SolutionEdge {
   source: string;
   target: string;
   label?: string;
+  type?: SolutionEdgeType;
 }
 
 /** 解题引导面板数据 */
@@ -100,6 +132,7 @@ export interface SolutionPath {
   problem: string;
   problemType: string;
   difficulty: 1 | 2 | 3 | 4 | 5;
+  portrait: SolutionPortrait;
   steps: SolutionStep[];
   edges: SolutionEdge[];
   summary: string;
@@ -319,6 +352,31 @@ export interface DiagnosisRecord {
   retestResult?: DiagnosisSubmissionResult;
 }
 
+export interface SolutionStepAttempt {
+  stepId: string;
+  answer?: string;
+  isDirectionCorrect: boolean;
+  knowledgeIds: string[];
+  recommendedLearningPathTargetId?: string;
+  recommendedRecoveryNodeId?: string;
+  recommendedLearnTargetId?: string;
+  recommendedLearnQuery?: string;
+  branchStepId?: string;
+  submittedAt: string;
+}
+
+export interface SolutionAttemptSession {
+  problemKey: string;
+  problem: string;
+  pathSnapshot: SolutionPath;
+  activeStepId?: string;
+  stepStates: Record<string, SolutionStepState>;
+  selectedAnswers: Record<string, string | null>;
+  attempts: Record<string, SolutionStepAttempt>;
+  highlightedBranchStepIds: string[];
+  updatedAt: string;
+}
+
 export const ERROR_CATEGORY_LABELS: Record<ErrorCategory, string> = {
   concept: "概念未掌握",
   formula: "公式选错/记错",
@@ -356,6 +414,7 @@ export interface LearningPathProgress {
   updatedAt: string;
   status: "active" | "completed";
   activeDiagnosisQuestionId?: string;
+  activeSolveProblemKey?: string;
 }
 
 export interface StudentProgress {
@@ -368,6 +427,7 @@ export interface StudentProgress {
   }[];
   learningPaths: LearningPathProgress[];
   diagnosisRecords: DiagnosisRecord[];
+  solutionAttempts: SolutionAttemptSession[];
 }
 
 // ---- UI 状态 ----
@@ -392,6 +452,15 @@ export interface AppState {
     isCorrect: boolean
   ) => void;
   startDiagnosisRecovery: (questionId: string) => string | undefined;
+  upsertSolutionAttemptSession: (session: SolutionAttemptSession) => void;
+  startSolutionRecovery: (params: {
+    problemKey: string;
+    knowledgeIds: string[];
+    recommendedLearningPathTargetId?: string;
+    recommendedRecoveryNodeId?: string;
+    recommendedLearnTargetId?: string;
+    recommendedLearnQuery?: string;
+  }) => string | undefined;
   getMastery: (nodeId: string) => MasteryLevel;
   getMasteryScore: (nodeId: string) => number;
 
@@ -479,4 +548,11 @@ export const STEP_TYPE_COLORS: Record<SolutionStepType, string> = {
   reasoning: "#10b981",
   verification: "#06b6d4",
   conclusion: "#ef4444",
+};
+
+export const SOLUTION_STATE_LABELS: Record<SolutionStepState, string> = {
+  locked: "未展开",
+  hinted: "已提示",
+  attempted: "方向正确",
+  offtrack: "方向偏离",
 };

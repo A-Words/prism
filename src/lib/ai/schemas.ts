@@ -23,6 +23,8 @@ const solutionStepTypeSchema = z.enum([
   "verification",
   "conclusion",
 ]);
+const solutionBranchTypeSchema = z.enum(["main", "mistake"]);
+const solutionEdgeTypeSchema = z.enum(["main", "mistake_branch", "return_main"]);
 const errorCategorySchema = z.enum([
   "concept",
   "formula",
@@ -45,6 +47,15 @@ export const interactionPointSchema = z.object({
   question: z.string().min(1),
   options: z.array(z.string().min(1)).optional(),
   hint: z.string().min(1),
+  correctOption: z.string().optional(),
+  correctFeedback: z.string().optional(),
+  wrongFeedback: z.string().optional(),
+  mistakeKnowledgeId: z.string().optional(),
+  recommendedLearningPathTargetId: z.string().optional(),
+  recommendedRecoveryNodeId: z.string().optional(),
+  recommendedLearnTargetId: z.string().optional(),
+  recommendedLearnQuery: z.string().optional(),
+  branchStepId: z.string().optional(),
 });
 
 export const solutionStepSchema = z.object({
@@ -58,12 +69,16 @@ export const solutionStepSchema = z.object({
   commonMistake: z.string().optional(),
   alternativeApproach: z.string().optional(),
   interactionPoint: interactionPointSchema.optional(),
+  branchType: solutionBranchTypeSchema.optional(),
+  branchFromStepId: z.string().optional(),
+  branchRecoveryHint: z.string().optional(),
 });
 
 export const solutionEdgeSchema = z.object({
   source: z.string().min(1),
   target: z.string().min(1),
   label: z.string().optional(),
+  type: solutionEdgeTypeSchema.optional(),
 });
 
 export const problemGuideSchema = z.object({
@@ -89,11 +104,44 @@ export const problemGuideSchema = z.object({
   stepHints: z.array(z.string().min(1)).min(3),
 });
 
+export const solutionPortraitSchema = z.object({
+  stage: z.string().min(1),
+  problemType: z.string().min(1),
+  difficulty: difficultySchema,
+  knowledgePoints: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        category: z.enum([
+          "algebra",
+          "geometry",
+          "trigonometry",
+          "probability",
+          "analysis",
+          "vector",
+          "sequence",
+        ]),
+      })
+    )
+    .min(1),
+  prerequisites: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        why: z.string().min(1),
+      })
+    )
+    .min(1),
+});
+
 export const solutionPathSchema = z.object({
   problem: z.string().min(1),
   problemType: z.string().min(1),
   difficulty: difficultySchema,
-  steps: z.array(solutionStepSchema).min(5).max(8),
+  portrait: solutionPortraitSchema,
+  steps: z.array(solutionStepSchema).min(7).max(12),
   edges: z.array(solutionEdgeSchema).min(4),
   summary: z.string().min(1),
   relatedKnowledge: z.array(z.string().min(1)).min(1),

@@ -132,6 +132,16 @@
     box-shadow: 0 2px 12px rgba(16, 185, 129, 0.18);
   }
 
+  .solution-step-node[data-state="offtrack"] {
+    border-color: #fb923c;
+    box-shadow: 0 2px 12px rgba(249, 115, 22, 0.18);
+  }
+
+  .solution-step-node[data-branch="mistake"] {
+    background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+    border-style: dashed;
+  }
+
   /* Guide sidebar */
   .guide-sidebar {
     background: rgba(255, 255, 255, 0.92);

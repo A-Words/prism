@@ -151,6 +151,34 @@ export const mockSolutionPath: SolutionPath = {
   problem: "解不等式 $x^2 - 3x + 2 < 0$",
   problemType: "一元二次不等式",
   difficulty: 2,
+  portrait: {
+    stage: "高中数学",
+    problemType: "一元二次不等式",
+    difficulty: 2,
+    knowledgePoints: [
+      { id: "inequality-basic", name: "不等式的性质", category: "algebra" },
+      { id: "function-quadratic", name: "二次函数", category: "algebra" },
+      { id: "function-zero", name: "函数的零点", category: "algebra" },
+      { id: "set-operations", name: "集合的运算", category: "algebra" },
+    ],
+    prerequisites: [
+      {
+        id: "function-quadratic",
+        name: "二次函数",
+        why: "需要知道图像开口方向和两根位置如何影响函数正负。",
+      },
+      {
+        id: "inequality-basic",
+        name: "不等式的性质",
+        why: "需要理解解集、区间与严格不等号的表达。",
+      },
+      {
+        id: "set-operations",
+        name: "集合的运算",
+        why: "最后要把结果用集合或区间规范写出来。",
+      },
+    ],
+  },
   steps: [
     {
       id: "s1",
@@ -161,6 +189,7 @@ export const mockSolutionPath: SolutionPath = {
         "先看清题型，再选方法。这里求的不是一个数，而是一段满足条件的解集。",
       knowledgePoints: ["inequality-basic"],
       type: "analysis",
+      branchType: "main",
       whyThisStep:
         "题型判断会直接决定后续是走图像思路、代数思路还是分类讨论。",
       commonMistake:
@@ -173,7 +202,16 @@ export const mockSolutionPath: SolutionPath = {
           "先把所有项移到右边",
           "先代入特殊值",
         ],
+        correctOption: "先判断题型和目标",
+        correctFeedback: "先把题型和目标站稳，后面主线才不会跑偏。",
+        wrongFeedback: "如果一上来就算，很容易把解不等式做成解方程。",
         hint: "先确认是一元二次不等式，目标是求解集，而不是单个根。",
+        recommendedLearningPathTargetId: "function-quadratic",
+        recommendedRecoveryNodeId: "inequality-basic",
+        recommendedLearnTargetId: "inequality-basic",
+        recommendedLearnQuery: "一元二次不等式总把解集和根混掉",
+        mistakeKnowledgeId: "inequality-basic",
+        branchStepId: "s1-mistake-1",
       },
     },
     {
@@ -185,6 +223,7 @@ export const mockSolutionPath: SolutionPath = {
         "一元二次不等式的标准动作是：求根、看开口、定区间。",
       knowledgePoints: ["inequality-basic", "function-quadratic"],
       type: "strategy",
+      branchType: "main",
       whyThisStep: "先选策略，后做计算，能减少试错和低级失误。",
       commonMistake: "会因式分解，但不知道为什么还要看开口方向。",
       alternativeApproach:
@@ -192,7 +231,16 @@ export const mockSolutionPath: SolutionPath = {
       interactionPoint: {
         question: "这道题最省力的主策略是什么？",
         options: ["先求根再看图像", "直接列区间", "直接背口诀", "强行代入 4 个值"],
+        correctOption: "先求根再看图像",
+        correctFeedback: "先求根再看开口方向，是这类题最稳的主线。",
+        wrongFeedback: "如果直接列区间或背口诀，后面很容易把区间取反。",
         hint: "先把临界点找出来，图像和数轴判断才有抓手。",
+        recommendedLearningPathTargetId: "function-quadratic",
+        recommendedRecoveryNodeId: "function-quadratic",
+        recommendedLearnTargetId: "function-quadratic",
+        recommendedLearnQuery: "二次函数图像和区间符号总连不起来",
+        mistakeKnowledgeId: "function-quadratic",
+        branchStepId: "s2-mistake-1",
       },
     },
     {
@@ -203,12 +251,21 @@ export const mockSolutionPath: SolutionPath = {
         "两个根把数轴切成三段，每一段里函数值符号保持不变。",
       knowledgePoints: ["function-quadratic", "function-zero"],
       type: "computation",
+      branchType: "main",
       whyThisStep: "没有临界点，就无法把数轴拆成可判断的区间。",
       commonMistake: "因式分解时把中间项符号拆错。",
       interactionPoint: {
         question: "两个根会把数轴分成几段？",
         options: ["2 段", "3 段", "4 段"],
+        correctOption: "3 段",
+        correctFeedback: "两个根会把数轴切成三段，这是后面判断区间符号的底座。",
+        wrongFeedback: "先把根和分段连起来，别把求根停成孤立计算。",
         hint: "两个点把数轴切成三段：左边、中间、右边。",
+        recommendedLearningPathTargetId: "function-quadratic",
+        recommendedRecoveryNodeId: "function-zero",
+        recommendedLearnTargetId: "function-zero",
+        recommendedLearnQuery: "求根后总不会接数轴分段",
+        mistakeKnowledgeId: "function-zero",
       },
     },
     {
@@ -220,13 +277,24 @@ export const mockSolutionPath: SolutionPath = {
         "开口向上意味着图像中间低、两边高，因此“小于 0”时取中间。",
       knowledgePoints: ["function-quadratic", "function-properties"],
       type: "reasoning",
+      branchType: "main",
       whyThisStep: "这是二次不等式真正的核心判断，不是机械套公式。",
       commonMistake: "把“大于取两边，小于取中间”的适用前提忘掉了。",
       alternativeApproach:
         "也可以在每个区间各取一个测试点代入做保险验证。",
       interactionPoint: {
         question: "为什么这一步可以不逐段代入？",
+        options: ["因为开口方向已经决定区间符号", "因为所有二次不等式都只取中间", "因为只要根求出来答案就固定了"],
+        correctOption: "因为开口方向已经决定区间符号",
+        correctFeedback: "图像开口方向会决定两根之间和两边的符号关系。",
+        wrongFeedback: "口诀只有在理解开口方向和图像关系后才可靠。",
         hint: "因为二次函数图像的开口方向已经决定了区间符号变化。",
+        recommendedLearningPathTargetId: "function-quadratic",
+        recommendedRecoveryNodeId: "function-quadratic",
+        recommendedLearnTargetId: "function-quadratic",
+        recommendedLearnQuery: "二次函数开口方向和区间符号总会混",
+        mistakeKnowledgeId: "function-quadratic",
+        branchStepId: "s4-mistake-1",
       },
     },
     {
@@ -238,12 +306,21 @@ export const mockSolutionPath: SolutionPath = {
         "严格不等号对应开区间，含等号时才考虑把端点并进去。",
       knowledgePoints: ["inequality-basic", "set-operations"],
       type: "verification",
+      branchType: "main",
       whyThisStep: "很多题不是不会做，而是边界写错。",
       commonMistake: "把开区间写成闭区间，或者括号和方括号混用。",
       interactionPoint: {
         question: "如果改成 $\\leq 0$，区间会怎样变化？",
         options: ["仍是 $(1, 2)$", "变成 $[1, 2]$", "变成 $(1, 2]$"],
+        correctOption: "变成 $[1, 2]$",
+        correctFeedback: "含等号时，端点也满足条件，所以边界会并进去。",
+        wrongFeedback: "边界是否可取只由不等号决定，别凭感觉写括号。",
         hint: "含等号时，两个根也满足条件，所以会变成闭区间。",
+        recommendedLearningPathTargetId: "set-operations",
+        recommendedRecoveryNodeId: "set-operations",
+        recommendedLearnTargetId: "set-operations",
+        recommendedLearnQuery: "区间边界和集合表达总写错",
+        mistakeKnowledgeId: "set-operations",
       },
     },
     {
@@ -255,19 +332,46 @@ export const mockSolutionPath: SolutionPath = {
         "写出规范答案后，再代一个区间内点验证，是完整的解题闭环。",
       knowledgePoints: ["set-operations"],
       type: "conclusion",
+      branchType: "main",
       whyThisStep: "最后一步不是重复，而是把思路收束成标准得分表达。",
       interactionPoint: {
         question: "除了代入 $1.5$，你还能怎么验证？",
         hint: "可以再代一个区间外的值，验证它确实不满足不等式。",
       },
     },
+    {
+      id: "s1-mistake-1",
+      title: "易错分支：把不等式看成方程",
+      content: "如果一上来只盯着“求根”，你会把解不等式误做成解方程，停在两个根上。 ",
+      explanation: "偏离原因：没有先确认题目目标是解集，导致后面的区间判断整段消失。",
+      knowledgePoints: ["inequality-basic"],
+      type: "analysis",
+      branchType: "mistake",
+      branchFromStepId: "s1",
+      branchRecoveryHint: "先回到主线重新确认题型与目标，再进入求根和图像判断。",
+    },
+    {
+      id: "s4-mistake-1",
+      title: "易错分支：只背口诀不看开口",
+      content: "如果只记“中间 / 两边”的口诀而不看开口方向，区间很容易整体取反。",
+      explanation: "偏离原因：开口方向和图像位置关系没有真正建立，口诀变成了不稳定的死记。",
+      knowledgePoints: ["function-quadratic"],
+      type: "reasoning",
+      branchType: "mistake",
+      branchFromStepId: "s4",
+      branchRecoveryHint: "先回到主线重新看 $a$ 的正负，再用图像判断小于 0 取哪一段。",
+    },
   ],
   edges: [
-    { source: "s1", target: "s2", label: "明确题型后" },
-    { source: "s2", target: "s3", label: "确定方法后" },
-    { source: "s3", target: "s4", label: "找到根后" },
-    { source: "s4", target: "s5", label: "判断区间后" },
-    { source: "s5", target: "s6", label: "确认边界后" },
+    { source: "s1", target: "s2", label: "明确题型后", type: "main" },
+    { source: "s2", target: "s3", label: "确定方法后", type: "main" },
+    { source: "s3", target: "s4", label: "找到根后", type: "main" },
+    { source: "s4", target: "s5", label: "判断区间后", type: "main" },
+    { source: "s5", target: "s6", label: "确认边界后", type: "main" },
+    { source: "s1", target: "s1-mistake-1", label: "若方向偏离", type: "mistake_branch" },
+    { source: "s1-mistake-1", target: "s1", label: "回到主线", type: "return_main" },
+    { source: "s4", target: "s4-mistake-1", label: "若方向偏离", type: "mistake_branch" },
+    { source: "s4-mistake-1", target: "s4", label: "回到主线", type: "return_main" },
   ],
   summary:
     "这题的关键不是会不会算，而是能不能把“求根 + 开口方向 + 区间判断”串成一个完整动作。",
@@ -1008,6 +1112,74 @@ const learningScenarioMap = new Map(
   learningScenariosSeed.map((scenario) => [scenario.id, scenario])
 );
 
+function getLearningScenarioByExactTargetId(targetId?: string) {
+  const normalizedTargetId = targetId?.trim();
+  if (!normalizedTargetId) {
+    return undefined;
+  }
+
+  return learningScenariosSeed.find(
+    (scenario) => scenario.targetId === normalizedTargetId
+  );
+}
+
+function scoreLearningScenario(
+  scenario: MockLearningScenario,
+  normalized: string
+) {
+  const haystacks = [
+    scenario.title,
+    scenario.dashboardTitle,
+    scenario.targetId,
+    ...scenario.queryAliases,
+    ...scenario.plan.nodes.map(
+      (node) => `${node.knowledgeId}${getKnowledgeNode(node.knowledgeId)?.name || ""}`
+    ),
+  ];
+
+  return haystacks.reduce((sum, candidate) => {
+    const normalizedCandidate = normalizeText(candidate);
+    if (normalizedCandidate === normalized) {
+      return sum + 10;
+    }
+    if (
+      normalizedCandidate.includes(normalized) ||
+      normalized.includes(normalizedCandidate)
+    ) {
+      return sum + 4;
+    }
+    return sum;
+  }, 0);
+}
+
+export function resolveMockLearningScenarioForKnowledge(params: {
+  knowledgeId: string;
+  query?: string;
+}) {
+  const knowledgeId = params.knowledgeId.trim();
+  const candidates = learningScenariosSeed.filter((scenario) =>
+    scenario.plan.nodes.some((node) => node.knowledgeId === knowledgeId)
+  );
+  if (candidates.length === 0) {
+    return undefined;
+  }
+
+  const query = params.query?.trim();
+  if (!query) {
+    return candidates[0];
+  }
+
+  const normalized = normalizeText(query);
+  return (
+    [...candidates]
+      .map((scenario) => ({
+        scenario,
+        score: scoreLearningScenario(scenario, normalized),
+      }))
+      .sort((a, b) => b.score - a.score)[0]?.scenario || candidates[0]
+  );
+}
+
 export const mockLearningScenarios = learningScenariosSeed;
 export const featuredLearningSceneIds = [
   "scene-derivative",
@@ -1054,16 +1226,13 @@ export function resolveMockLearningScenario(params?: {
   query?: string;
   targetId?: string;
 }) {
-  const targetId = params?.targetId?.trim();
-  if (targetId) {
-    const exactTarget =
-      learningScenariosSeed.find((scenario) => scenario.targetId === targetId) ||
-      learningScenariosSeed.find((scenario) =>
-        scenario.plan.nodes.some((node) => node.knowledgeId === targetId)
-      );
-    if (exactTarget) {
-      return exactTarget;
-    }
+  const exactTarget = getLearningScenarioByExactTargetId(params?.targetId);
+  if (exactTarget) {
+    return exactTarget;
+  }
+
+  if (params?.targetId?.trim()) {
+    return undefined;
   }
 
   const query = params?.query?.trim();
@@ -1071,32 +1240,7 @@ export function resolveMockLearningScenario(params?: {
     const normalized = normalizeText(query);
     const scored = learningScenariosSeed
       .map((scenario) => {
-        const haystacks = [
-          scenario.title,
-          scenario.dashboardTitle,
-          scenario.targetId,
-          ...scenario.queryAliases,
-          ...scenario.plan.nodes.map(
-            (node) =>
-              `${node.knowledgeId}${getKnowledgeNode(node.knowledgeId)?.name || ""}`
-          ),
-        ];
-
-        const score = haystacks.reduce((sum, candidate) => {
-          const normalizedCandidate = normalizeText(candidate);
-          if (normalizedCandidate === normalized) {
-            return sum + 10;
-          }
-          if (
-            normalizedCandidate.includes(normalized) ||
-            normalized.includes(normalizedCandidate)
-          ) {
-            return sum + 4;
-          }
-          return sum;
-        }, 0);
-
-        return { scenario, score };
+        return { scenario, score: scoreLearningScenario(scenario, normalized) };
       })
       .sort((a, b) => b.score - a.score);
 
@@ -1115,7 +1259,16 @@ export function getMockLearningPlan(params?: {
   goalLevel?: LearningGoalLevel;
   generationMode?: LearningGenerationMode;
 }) {
-  const scenario = resolveMockLearningScenario(params);
+  const scenario =
+    resolveMockLearningScenario(params) ||
+    (params?.targetId
+      ? resolveMockLearningScenarioForKnowledge({
+          knowledgeId: params.targetId,
+          query: params.query,
+        })
+      : undefined) ||
+    learningScenarioMap.get("scene-derivative") ||
+    learningScenariosSeed[0];
   return createLearningPlan(
     {
       sceneId: scenario.plan.sceneId || scenario.id,
@@ -1145,7 +1298,15 @@ export function getMockLearningPlan(params?: {
 }
 
 export function getLearnHref(targetId: string, query?: string) {
-  const scene = resolveMockLearningScenario({ targetId, query });
+  const scene =
+    getLearningScenarioByExactTargetId(targetId) ||
+    resolveMockLearningScenarioForKnowledge({
+      knowledgeId: targetId,
+      query: query || getKnowledgeNode(targetId)?.name,
+    }) ||
+    resolveMockLearningScenario({ query, targetId }) ||
+    learningScenarioMap.get("scene-derivative") ||
+    learningScenariosSeed[0];
   const q = query || scene.title;
   return `/learn?target=${scene.targetId}&query=${encodeURIComponent(q)}`;
 }
