@@ -528,7 +528,14 @@ function detectTemplate(problem: string): TemplateId {
     return "domain";
   }
   if (
-    (text.includes("\\sin") || text.includes("\\cos") || text.includes("\\tan")) &&
+    (
+      text.includes("\\sin") ||
+      text.includes("\\cos") ||
+      text.includes("\\tan") ||
+      text.includes("sin") ||
+      text.includes("cos") ||
+      text.includes("tan")
+    ) &&
     text.includes("2")
   ) {
     return "trig-transform";

@@ -141,7 +141,7 @@ export const solutionPathSchema = z.object({
   problemType: z.string().min(1),
   difficulty: difficultySchema,
   portrait: solutionPortraitSchema,
-  steps: z.array(solutionStepSchema).min(7).max(12),
+  steps: z.array(solutionStepSchema).min(5).max(12),
   edges: z.array(solutionEdgeSchema).min(4),
   summary: z.string().min(1),
   relatedKnowledge: z.array(z.string().min(1)).min(1),

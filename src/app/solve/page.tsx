@@ -431,13 +431,6 @@ export default function SolvePage() {
       </div>
 
       <div className="glass-card p-5">
-        <div className="mb-3 flex items-center gap-2">
-          <span className="badge bg-cyan-100 text-cyan-700">结构化生成</span>
-          <span className="text-xs text-slate-400">
-            后端会优先调用 AI 生成路径，超时或失败时自动回退到规则模板。
-          </span>
-        </div>
-
         <div className="flex gap-3">
           <div className="flex-1">
             <textarea
