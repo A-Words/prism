@@ -146,6 +146,19 @@ const INTERACTION_OVERRIDES: Partial<
       recommendedLearnQuery: "定义域题不知道先列条件还是先算",
       mistakeKnowledgeId: "function-concept",
     },
+    s2: {
+      question: "列定义域条件时，下面哪条规则最需要先锁定？",
+      options: ["按特殊表达式逐条套合法性规则", "把式子先整体化简掉", "先猜一个答案区间再回代"],
+      hint: "定义域题先靠规则拆条件，不要先靠化简或猜区间。",
+      correctOption: "按特殊表达式逐条套合法性规则",
+      correctFeedback: "先把对数、根号、分式这些局部规则锁住，条件才不会漏。",
+      wrongFeedback: "如果先整体化简或先猜区间，最容易把某一块表达式的合法性漏掉。",
+      recommendedLearningPathTargetId: "function-logarithmic",
+      recommendedRecoveryNodeId: "function-logarithmic",
+      recommendedLearnTargetId: "function-logarithmic",
+      recommendedLearnQuery: "定义域题总会漏掉对数根号分式的局部条件",
+      mistakeKnowledgeId: "function-logarithmic",
+    },
     s3: {
       question: "把条件列出来以后，下一步最该做什么？",
       options: ["直接写答案", "统一成区间再取交集", "只保留最严格的一个条件"],
@@ -258,6 +271,19 @@ const INTERACTION_OVERRIDES: Partial<
       recommendedLearnQuery: "椭圆题总是找不到入口",
       mistakeKnowledgeId: "analytic-ellipse",
     },
+    s4: {
+      question: "当定义或标准性质不够直接时，下一步最稳的动作是什么？",
+      options: ["把几何条件翻译成代数关系", "继续凭图形猜答案", "把所有坐标都随便设出来"],
+      hint: "解析几何最稳的推进方式，是把几何语言先落到方程和参数关系上。",
+      correctOption: "把几何条件翻译成代数关系",
+      correctFeedback: "几何关系一旦翻成代数表达，后面的计算才有抓手。",
+      wrongFeedback: "只靠图形猜或者乱设坐标，通常会把题目本来的结构打散。",
+      recommendedLearningPathTargetId: "analytic-ellipse",
+      recommendedRecoveryNodeId: "analytic-line",
+      recommendedLearnTargetId: "analytic-line",
+      recommendedLearnQuery: "解析几何总不会把几何条件翻译成代数关系",
+      mistakeKnowledgeId: "analytic-line",
+    },
   },
   generic: {
     s1: {
@@ -272,6 +298,19 @@ const INTERACTION_OVERRIDES: Partial<
       recommendedLearnTargetId: "function-concept",
       recommendedLearnQuery: "做题总是一上来就乱算",
       mistakeKnowledgeId: "function-concept",
+    },
+    s3: {
+      question: "题型和条件大致看清后，下一步最稳的动作是什么？",
+      options: ["先组织主方法", "先把最终答案形式写死", "先跳过约束直接算"],
+      hint: "先决定主方法，再推进计算，比边算边改路线更稳。",
+      correctOption: "先组织主方法",
+      correctFeedback: "先定主方法，后面的每一步才有连续性。",
+      wrongFeedback: "如果还没定主方法就直接算，通常会在中途发现路线根本不对。",
+      recommendedLearningPathTargetId: "function-properties",
+      recommendedRecoveryNodeId: "function-properties",
+      recommendedLearnTargetId: "function-properties",
+      recommendedLearnQuery: "做综合题总会边算边改方法",
+      mistakeKnowledgeId: "function-properties",
     },
   },
 };
@@ -673,6 +712,8 @@ function buildRuleSolutionPath(
             explanation: "定义域题不是一口气看整体，而是先逐块列条件。",
             knowledgePoints: ["function-concept", "inequality-basic"],
             type: "analysis",
+            whyThisStep: "先拆表达式，后列条件，才能避免把不同限制混成一团。",
+            commonMistake: "看到整体式子就直接硬算，没有先逐块列合法条件。",
           },
           {
             id: "s2",
@@ -681,6 +722,8 @@ function buildRuleSolutionPath(
             explanation: "这些规则是定义域题最稳定的底层动作。",
             knowledgePoints: ["function-logarithmic", "inequality-basic"],
             type: "strategy",
+            whyThisStep: "先把局部规则锁住，后面列条件时才不会漏项。",
+            commonMistake: "把对数、根号、分式的合法性规则混在一起，导致条件写反或漏写。",
           },
           {
             id: "s3",
@@ -689,6 +732,8 @@ function buildRuleSolutionPath(
             explanation: "定义域的中间层不是直接写答案，而是形成若干待合并的条件。",
             knowledgePoints: ["inequality-basic", "set-operations"],
             type: "computation",
+            whyThisStep: "把零散条件转成统一形式，后面交集才有操作空间。",
+            commonMistake: "条件列出来了，却没有统一成区间，最后没法稳定做交集。",
           },
           {
             id: "s4",
@@ -697,6 +742,7 @@ function buildRuleSolutionPath(
             explanation: "定义域题最容易丢分的往往就是最后这一步。",
             knowledgePoints: ["set-operations", "inequality-basic"],
             type: "reasoning",
+            whyThisStep: "定义域本质是所有合法条件同时成立，核心动作就是取交集。",
           },
           {
             id: "s5",
@@ -705,6 +751,7 @@ function buildRuleSolutionPath(
             explanation: "验证能快速暴露掉端点或交集写错的问题。",
             knowledgePoints: ["function-concept"],
             type: "verification",
+            whyThisStep: "代表值验证能在最后一刻拦住边界和区间方向错误。",
           },
           {
             id: "s6",
@@ -713,6 +760,7 @@ function buildRuleSolutionPath(
             explanation: "最后一定要把“合法输入”写成完整答案，而不是停在零散条件上。",
             knowledgePoints: ["set-operations"],
             type: "conclusion",
+            whyThisStep: "规范表达能把前面的条件合并真正落成答案。",
           },
         ],
         edges: [],
@@ -762,6 +810,8 @@ function buildRuleSolutionPath(
             explanation: "三角题最怕一上来乱代公式，先看“已知什么、求什么”才知道最短路径。",
             knowledgePoints: ["trig-identity"],
             type: "analysis",
+            whyThisStep: "已知和目标一旦看错，后面的公式路径就会整体偏离。",
+            commonMistake: "一上来就背公式硬套，没有先看已知量和目标量的关系。",
           },
           {
             id: "s2",
@@ -770,6 +820,8 @@ function buildRuleSolutionPath(
             explanation: "少绕一步，就少一个符号或平方根正负的风险点。",
             knowledgePoints: ["trig-transform", "trig-identity"],
             type: "strategy",
+            whyThisStep: "路径越短，越不容易制造额外符号和象限风险。",
+            commonMistake: "公式会背很多条，却没有先选最短那条主线。",
           },
           {
             id: "s3",
@@ -778,6 +830,7 @@ function buildRuleSolutionPath(
             explanation: "让公式服务于结构，而不是一边变形一边临时改策略。",
             knowledgePoints: ["trig-transform"],
             type: "computation",
+            whyThisStep: "先落到主表达式，再化简，能避免中途不断换路。",
           },
           {
             id: "s4",
@@ -786,6 +839,8 @@ function buildRuleSolutionPath(
             explanation: "平方根、象限和商数关系是三角题最常见的翻车点。",
             knowledgePoints: ["trig-definition", "trig-identity"],
             type: "reasoning",
+            whyThisStep: "符号和象限是三角题里最容易把正确结构做成错误答案的一层。",
+            commonMistake: "由一个三角函数反推另一个时，忽略了象限和正负号检查。",
           },
           {
             id: "s5",
@@ -794,6 +849,7 @@ function buildRuleSolutionPath(
             explanation: "三角题做完不等于结束，还要看有没有留下本可避免的绕路痕迹。",
             knowledgePoints: ["trig-transform"],
             type: "verification",
+            whyThisStep: "最后整理结果形式，能把“算对但没答到位”的问题提前挡住。",
           },
           {
             id: "s6",
@@ -802,6 +858,7 @@ function buildRuleSolutionPath(
             explanation: "三角题真正要积累的是“看到条件就会挑公式”的路径感。",
             knowledgePoints: ["trig-transform"],
             type: "conclusion",
+            whyThisStep: "沉淀选路经验，比单次算对更能迁移到下一题。",
           },
         ],
         edges: [],
@@ -846,6 +903,8 @@ function buildRuleSolutionPath(
             explanation: "条件概率不是在原样本空间里硬算，而是先明确条件缩小了什么。",
             knowledgePoints: ["prob-basic", "prob-conditional"],
             type: "analysis",
+            whyThisStep: "先区分“求谁”和“已知谁”，后面样本空间才不会看错。",
+            commonMistake: "把目标事件和条件事件混成一件事，直接套公式硬算。",
           },
           {
             id: "s2",
@@ -854,6 +913,8 @@ function buildRuleSolutionPath(
             explanation: "条件概率的分母本质上是新样本空间的总量。",
             knowledgePoints: ["prob-conditional"],
             type: "strategy",
+            whyThisStep: "条件概率的关键不是公式，而是先把观察范围缩小。",
+            commonMistake: "条件已经给了，却还在原样本空间里数分子分母。",
           },
           {
             id: "s3",
@@ -862,6 +923,7 @@ function buildRuleSolutionPath(
             explanation: "条件概率常见的实操动作是先抓交集，再除以条件事件。",
             knowledgePoints: ["prob-basic", "set-operations"],
             type: "computation",
+            whyThisStep: "只有先抓住交事件，分子到底在数什么才会清楚。",
           },
           {
             id: "s4",
@@ -870,6 +932,7 @@ function buildRuleSolutionPath(
             explanation: "公式本身不难，难的是每个量背后到底在数什么。",
             knowledgePoints: ["prob-conditional"],
             type: "reasoning",
+            whyThisStep: "分子分母一旦不在同一视角，形式对了结果也会错。",
           },
           {
             id: "s5",
@@ -878,6 +941,7 @@ function buildRuleSolutionPath(
             explanation: "概率题算完要回看语义，结果才不会只是一个孤立数字。",
             knowledgePoints: ["prob-basic"],
             type: "verification",
+            whyThisStep: "结果范围和语义是概率题最有效的最后一层自检。",
           },
           {
             id: "s6",
@@ -886,6 +950,7 @@ function buildRuleSolutionPath(
             explanation: "条件概率最重要的不是公式，而是“重新看样本空间”的意识。",
             knowledgePoints: ["prob-conditional"],
             type: "conclusion",
+            whyThisStep: "真正可迁移的是“条件改变观察范围”的视角，不是单个算式。",
           },
         ],
         edges: [],
@@ -930,6 +995,8 @@ function buildRuleSolutionPath(
             explanation: "数列题最怕下标关系没看清，后面每一步都会跟着偏。",
             knowledgePoints: ["seq-concept"],
             type: "analysis",
+            whyThisStep: "先看清下标关系，后面的公差段数和目标项位置才会稳定。",
+            commonMistake: "没先看清第几项和求第几项，直接套公式导致下标差看错。",
           },
           {
             id: "s2",
@@ -938,6 +1005,8 @@ function buildRuleSolutionPath(
             explanation: "固定步长是等差数列最稳定的视角。",
             knowledgePoints: ["seq-arithmetic"],
             type: "strategy",
+            whyThisStep: "先把固定步长关系立住，再算公差和目标项才不会乱。",
+            commonMistake: "公式会写，但没有先把固定步长关系对应到具体下标差上。",
           },
           {
             id: "s3",
@@ -946,6 +1015,7 @@ function buildRuleSolutionPath(
             explanation: "绝大多数等差数列题都要先把公差这一层稳住。",
             knowledgePoints: ["seq-arithmetic"],
             type: "computation",
+            whyThisStep: "先稳住公差或首项，后面代目标项才有可靠抓手。",
           },
           {
             id: "s4",
@@ -954,6 +1024,7 @@ function buildRuleSolutionPath(
             explanation: "这一步看似机械，实际是在检验前面的节奏感是否稳定。",
             knowledgePoints: ["seq-arithmetic", "seq-concept"],
             type: "reasoning",
+            whyThisStep: "只有把前面的公差关系真正接回目标项，题目才算走完主线。",
           },
           {
             id: "s5",
@@ -962,6 +1033,7 @@ function buildRuleSolutionPath(
             explanation: "数列题很适合做数量级检查，能快速发现明显偏差。",
             knowledgePoints: ["seq-concept"],
             type: "verification",
+            whyThisStep: "趋势和数量级检查能快速拦住下标差错、符号错和代入错。",
           },
           {
             id: "s6",
@@ -970,6 +1042,7 @@ function buildRuleSolutionPath(
             explanation: "等差数列真正要练稳的是节奏，不是孤立公式。",
             knowledgePoints: ["seq-arithmetic"],
             type: "conclusion",
+            whyThisStep: "把步骤沉淀成固定节奏，下一次才不会重新从公式开始乱试。",
           },
         ],
         edges: [],
@@ -1014,6 +1087,8 @@ function buildRuleSolutionPath(
             explanation: "椭圆题不一定先联立方程，很多时候更快的入口是几何定义。",
             knowledgePoints: ["analytic-ellipse"],
             type: "analysis",
+            whyThisStep: "入口判断一旦错了，后面计算量会被无意义地放大。",
+            commonMistake: "看到椭圆题就直接联立方程，没有先判断入口是定义还是标准式信息。",
           },
           {
             id: "s2",
@@ -1022,6 +1097,7 @@ function buildRuleSolutionPath(
             explanation: "椭圆题的很多条件最终都要落回 a、b、c 或定义关系。",
             knowledgePoints: ["analytic-ellipse", "analytic-circle"],
             type: "strategy",
+            whyThisStep: "先提参数和焦点信息，后面的定义或方程关系才有落点。",
           },
           {
             id: "s3",
@@ -1030,6 +1106,7 @@ function buildRuleSolutionPath(
             explanation: "椭圆定义往往比联立方程更快、更稳。",
             knowledgePoints: ["analytic-ellipse"],
             type: "computation",
+            whyThisStep: "优先调用定义能避免把本可直接解决的题做成重计算。",
           },
           {
             id: "s4",
@@ -1038,6 +1115,8 @@ function buildRuleSolutionPath(
             explanation: "解析几何的难点不是算，而是把几何语言准确落成代数表达。",
             knowledgePoints: ["analytic-line", "analytic-ellipse"],
             type: "reasoning",
+            whyThisStep: "几何语言只有翻成代数，后面的推导才有明确抓手。",
+            commonMistake: "几何条件还没翻译成代数关系，就开始凭图形感觉硬算。",
           },
           {
             id: "s5",
@@ -1046,6 +1125,7 @@ function buildRuleSolutionPath(
             explanation: "图形直觉能帮你快速发现很多代数计算中的离谱结果。",
             knowledgePoints: ["analytic-ellipse", "function-properties"],
             type: "verification",
+            whyThisStep: "图形直觉是解析几何里检查离谱结果的最快方式之一。",
           },
           {
             id: "s6",
@@ -1054,6 +1134,7 @@ function buildRuleSolutionPath(
             explanation: "椭圆题真正积累的是入口判断，而不是孤立结论。",
             knowledgePoints: ["analytic-ellipse"],
             type: "conclusion",
+            whyThisStep: "复盘入口选择，下一次才能更快看出题目的主线。",
           },
         ],
         edges: [],
@@ -1098,6 +1179,8 @@ function buildRuleSolutionPath(
             explanation: "题型判断是后续所有动作的入口，不先定方向就容易乱算。",
             knowledgePoints: ["function-concept"],
             type: "analysis",
+            whyThisStep: "题型和目标决定后续主方法，不先定方向会不断返工。",
+            commonMistake: "没先判断题型和目标，就直接开始计算。",
           },
           {
             id: "s2",
@@ -1106,6 +1189,7 @@ function buildRuleSolutionPath(
             explanation: "先把信息结构整理清楚，后面才知道该选哪条主线。",
             knowledgePoints: ["function-concept"],
             type: "strategy",
+            whyThisStep: "先把条件显化，才能判断什么是核心、什么是约束。",
           },
           {
             id: "s3",
@@ -1114,6 +1198,8 @@ function buildRuleSolutionPath(
             explanation: "主方法一旦选错，后面计算量会被无意义地放大。",
             knowledgePoints: ["function-properties"],
             type: "computation",
+            whyThisStep: "先组织主方法，才能让后面的每一步围绕同一主线展开。",
+            commonMistake: "还没决定主方法，就边算边换路，导致过程越来越散。",
           },
           {
             id: "s4",
@@ -1122,14 +1208,25 @@ function buildRuleSolutionPath(
             explanation: "很多错误不是不会算，而是忽略了约束。",
             knowledgePoints: ["inequality-basic"],
             type: "reasoning",
+            whyThisStep: "关键约束决定哪些中间步骤和最终答案是合法的。",
           },
           {
             id: "s5",
+            title: "用代表值或极端情形做验证",
+            content: "在正式收束答案前，选一个代表值、边界点或极端情形检查方向是否合理。",
+            explanation: "验证不是额外负担，而是把前面主方法和约束重新对齐的一次快检。",
+            knowledgePoints: ["function-properties", "inequality-basic"],
+            type: "verification",
+            whyThisStep: "快检能在写最终答案前提前发现方向、符号和边界错误。",
+          },
+          {
+            id: "s6",
             title: "整理答案并验证",
             content: "把最终结果写成题目要求的形式，并做一次快速回查。",
             explanation: "答案不仅要算出来，还要和题意、条件、数量级一致。",
             knowledgePoints: ["set-operations"],
             type: "conclusion",
+            whyThisStep: "最后把过程收束成题目需要的答案形式，才是真正完成解题。",
           },
         ],
         edges: [],
@@ -1348,7 +1445,8 @@ async function tryGenerateAiSolution(
     await provider.generateStructured({
       system: [
         "你是高中数学解题路径助手。",
-        "请输出 5 到 8 个主干思维节点，并补充至少 2 个易错分支节点。",
+        "请优先输出 6 到 8 个主干思维节点；如果题目确实很短，也至少保证 5 个主干节点。",
+        "请补充至少 2 个易错分支节点，并让至少 2 个主干节点带有可挂分支的互动点。",
         "知识点 ID 必须来自给定知识图谱；如果不确定，优先使用更通用的已知 ID。",
         "必须包含结构化题目画像、前置知识、易错点、递进提示，以及可判方向的互动点。",
         "学生模式只反馈方向是否正确和简短提示，不直接给标准答案。",
@@ -1363,6 +1461,7 @@ async function tryGenerateAiSolution(
         "",
         "请生成适合学生模式的解题路径，避免直接输出完整标准答案。",
         "必须返回 portrait，steps 中主干节点 branchType=main，易错分支节点 branchType=mistake，edges 会由系统补全。",
+        "优先让 2 个以上主干节点具备 interactionPoint，并让这些节点适合挂接 mistake 分支。",
       ].join("\n"),
       schema: solutionPathAiSchema,
       temperature: 0.35,
