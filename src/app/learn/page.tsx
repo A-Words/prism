@@ -368,7 +368,7 @@ function LearnPageContent() {
         }
 
         const data: LearningPlan = await response.json();
-        const resolvedQuery = trimmedQuery || searchParams.get("query") || data.goal;
+        const resolvedQuery = trimmedQuery || data.goal;
         const restoredPath = findSavedPath(progress.learningPaths, data.targetKnowledgeId);
         const restoredNodeId =
           restoredPath?.currentNodeId ||
@@ -387,6 +387,7 @@ function LearnPageContent() {
           const params = new URLSearchParams();
           params.set("target", data.targetKnowledgeId);
           params.set("query", resolvedQuery);
+          lastBootstrapKey.current = `${data.targetKnowledgeId}|${resolvedQuery}`;
           router.replace(`/learn?${params.toString()}`, { scroll: false });
         }
 
@@ -399,7 +400,7 @@ function LearnPageContent() {
         setLoading(false);
       }
     },
-    [baseLevel, generationMode, goalLevel, progress.learningPaths, router, searchParams]
+    [baseLevel, generationMode, goalLevel, progress.learningPaths, router]
   );
 
   useEffect(() => {
